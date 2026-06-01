@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobFinder AI - Assistant de Recherche</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 20px; color: #333; }
+        .container { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; }
+        .section { margin-bottom: 25px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; }
+        textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; box-sizing: border-box; }
+        
+        .company-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+        .company-option { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+        .company-option input { cursor: pointer; }
+        
+        button { display: block; width: 100%; padding: 15px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        #status { margin-top: 20px; font-size: 14px; color: #7f8c8d; }
+        #results { margin-top: 20px; padding: 20px; background: #fdfdfd; border-left: 5px solid #3498db; border-radius: 4px; white-space: pre-wrap; display: none; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(52,152,219,.3); border-radius: 50%; border-top-color: #3498db; animation: spin 1s ease-in-out infinite; margin-right: 10px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 JobFinder AI</h1>
+        
+        <div class="section">
+            <label for="prompt">Votre profil et recherche :</label>
+            <textarea id="prompt" placeholder="Ex: Je suis un développeur Fullstack spécialisé en Node.js et React avec 5 ans d'expérience. Je recherche des postes en télétravail ou à Lille..."></textarea>
+        </div>
+
+        <div class="section">
+            <label>Entreprises à cibler :</label>
+            <div class="company-grid">
+                <label class="company-option"><input type="checkbox" name="company" value="kiabi" checked> Kiabi</label>
+                <label class="company-option"><input type="checkbox" name="company" value="exotec" checked> Exotec</label>
+                <label class="company-option"><input type="checkbox" name="company" value="boulanger" checked> Boulanger</label>
+                <label class="company-option"><input type="checkbox" name="company" value="inpost" checked> Inpost</label>
+                <label class="company-option"><input type="checkbox" name="company" value="adeo" checked> Adeo</label>
+                <label class="company-option"><input type="checkbox" name="company" value="norauto" checked> Norauto</label>
+                <label class="company-option"><input type="checkbox" name="company" value="ankama" checked> Ankama</label>
+                <label class="company-option"><input type="checkbox" name="company" value="jules" checked> Jules</label>
+                <label class="company-option"><input type="checkbox" name="company" value="laredoute" checked> La Redoute</label>
+                <label class="company-option"><input type="checkbox" name="company" value="bricorama" checked> Bricorama</label>
+                <label class="company-option"><input type="checkbox" name="company" value="sgs" checked> SGS</label>
+                <label class="company-option"><input type="checkbox" name="company" value="soprasteria" checked> Sopra Steria</label>
+                <label class="company-option"><input type="checkbox" name="company" value="hmgroup" checked> H&M Group</label>
+                <label class="company-option"><input type="checkbox" name="company" value="inetum" checked> Inetum</label>
+                <label class="company-option"><input type="checkbox" name="company" value="keyence" checked> Keyence</label>
+                <label class="company-option"><input type="checkbox" name="company" value="amplhire" checked> Amplhire</label>
+                <label class="company-option"><input type="checkbox" name="company" value="expeditors" checked> Expeditors</label>
+                <label class="company-option"><input type="checkbox" name="company" value="voyageprive" checked> Voyage Privé</label>
+                <label class="company-option"><input type="checkbox" name="company" value="rituals" checked> Rituals</label>
+                <label class="company-option"><input type="checkbox" name="company" value="covea" checked> Covéa</label>
+                <label class="company-option"><input type="checkbox" name="company" value="teamwork" checked> Teamwork</label>
+                <label class="company-option"><input type="checkbox" name="company" value="spiebatignolles" checked> Spie Batignolles</label>
+                <label class="company-option"><input type="checkbox" name="company" value="evoriel" checked> Evoriel</label>
+                <label class="company-option"><input type="checkbox" name="company" value="courir" checked> Courir</label>
+                <label class="company-option"><input type="checkbox" name="company" value="accorhotels" checked> Accor Hotels</label>
+                <label class="company-option"><input type="checkbox" name="company" value="mazars" checked> Mazars</label>
+                <label class="company-option"><input type="checkbox" name="company" value="lapeyre" checked> Lapeyre</label>
+                <label class="company-option"><input type="checkbox" name="company" value="alten" checked> Alten</label>
+                <label class="company-option"><input type="checkbox" name="company" value="nexton" checked> Nexton</label>
+                <label class="company-option"><input type="checkbox" name="company" value="citech" checked> Citech</label>
+                <label class="company-option"><input type="checkbox" name="company" value="kaufmanbroad" checked> Kaufman & Broad</label>
+                <label class="company-option"><input type="checkbox" name="company" value="loxam" checked> Loxam</label>
+                <label class="company-option"><input type="checkbox" name="company" value="acton" checked> Act-on</label>
+                <label class="company-option"><input type="checkbox" name="company" value="artelia" checked> Artelia</label>
+                <label class="company-option"><input type="checkbox" name="company" value="nexity" checked> Nexity</label>
+                <label class="company-option"><input type="checkbox" name="company" value="lesaffre" checked> Lesaffre</label>
+                <label class="company-option"><input type="checkbox" name="company" value="mousquetaires" checked> Mousquetaires</label>
+                <label class="company-option"><input type="checkbox" name="company" value="veolia" checked> Veolia</label>
+                <label class="company-option"><input type="checkbox" name="company" value="meilleurtaux" checked> Meilleurtaux</label>
+                <label class="company-option"><input type="checkbox" name="company" value="advens" checked> Advens</label>
+                <label class="company-option"><input type="checkbox" name="company" value="xplor" checked> Xplor</label>
+                <label class="company-option"><input type="checkbox" name="company" value="devoteam" checked> Devoteam</label>
+                <label class="company-option"><input type="checkbox" name="company" value="sia" checked> SIA</label>
+                <label class="company-option"><input type="checkbox" name="company" value="magellan" checked> Magellan</label>
+            </div>
+        </div>
+
+        <button id="searchBtn">Analyser les opportunités</button>
+
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const searchBtn = document.getElementById('searchBtn');
+        const resultsDiv = document.getElementById('results');
+        const statusDiv = document.getElementById('status');
+
+        searchBtn.onclick = async () => {
+            const prompt = document.getElementById('prompt').value.trim();
+            const companies = Array.from(document.querySelectorAll('input[name="company"]:checked'))
+                                  .map(cb => cb.value);
+
+            if (!prompt) return alert("Veuillez décrire ce que vous recherchez.");
+            if (companies.length === 0) return alert("Veuillez sélectionner au moins une entreprise.");
+
+            // UI Reset
+            searchBtn.disabled = true;
+            resultsDiv.style.display = 'none';
+            resultsDiv.textContent = '';
+            statusDiv.innerHTML = '<div class="loading-spinner"></div> Connexion au moteur de recherche...';
+
+            try {
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, companies })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const event = JSON.parse(line.substring(6));
+                            if (event.type === 'progress') {
+                                statusDiv.innerHTML = `<div class="loading-spinner"></div> Analyse en cours : <strong>${event.data.slug}</strong>...`;
+                            } else if (event.type === 'result') {
+                                statusDiv.textContent = '✅ Analyse terminée !';
+                                resultsDiv.style.display = 'block';
+                                resultsDiv.textContent = event.data.result;
+                            } else if (event.type === 'error') {
+                                statusDiv.textContent = '❌ Erreur : ' + event.data.error;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                statusDiv.textContent = "❌ Erreur de connexion au serveur.";
+                console.error(err);
+            } finally {
+                searchBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
