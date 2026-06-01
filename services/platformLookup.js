@@ -1,12 +1,6 @@
 const { fetchWithTimeout } = require('../lib/http');
 
-const PLATFORMS = {
-  SmartRecruiters: (slug) => `https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=30`,
-  Workable: (slug) => `https://apply.workable.com/api/v1/widget/accounts/${slug}?details=false`, 
-  Greenhouse: (slug) => `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs`,
-  Lever: (slug) => `https://api.lever.co/v0/postings/${slug}?mode=json`,
-  Teamtailor: (slug) => `https://${slug}.teamtailor.com/jobs.rss`
-};
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const PREDEFINED_COMPANIES = {
   kiabi: { platform: 'SmartRecruiters', url: 'https://api.smartrecruiters.com/v1/companies/kiabi/postings?country=fr&region=Hauts-de-France&limit=200' },
@@ -89,16 +83,6 @@ async function processSlug(slug, timeout, progress) {
       return { slug, found: true, platform: config.platform, url: config.url, body: r.text };
     }
     if (r.error) errors.push(`${config.platform}: ${r.error}`);
-  }
-
-  for (const [platform, fn] of Object.entries(PLATFORMS)) {
-    const candidate = fn(slug);
-    const r = await probeUrl(candidate, platform, timeout);
-    if (r.ok) {
-      if (typeof progress === 'function') progress({ slug, platform, state: 'found', url: candidate });
-      return { slug, found: true, platform, url: candidate, body: r.text };
-    }
-    if (r.error) errors.push(`${platform}: ${r.error}`);
   }
 
   if (typeof progress === 'function') progress({ slug, state: 'not_found' });
@@ -209,17 +193,24 @@ module.exports.lookupSlugs = async function lookupSlugs(slugs, options = {}) {
     }
   };
 
-  // Process all lookups in parallel to avoid Vercel timeouts and improve performance
-  const lookupPromises = normalized.map(async (slug) => {
-    try {
-      writeProgress({ slug, state: 'looking', platform: 'auto-detect' });
-      return await processSlug(slug, timeout, writeProgress);
-    } catch (err) {
-      return { slug, found: false, error: err.message };
-    }
-  });
+  const results = [];
+  const limit = options.concurrency || 2;
 
-  const results = await Promise.all(lookupPromises);
+  // Traitement par lots (batches) pour éviter le bannissement par les serveurs distants
+  for (let i = 0; i < normalized.length; i += limit) {
+    const chunk = normalized.slice(i, i + limit);
+    const chunkPromises = chunk.map(slug => {
+      writeProgress({ slug, state: 'looking', platform: 'auto-detect' });
+      return processSlug(slug, timeout, writeProgress).catch(err => ({ slug, found: false, error: err.message }));
+    });
+    
+    results.push(...(await Promise.all(chunkPromises)));
+
+    // Pause de 0.3s entre chaque lot, sauf pour le dernier
+    if (i + limit < normalized.length) {
+      await sleep(300);
+    }
+  }
 
   const lookupResults = results.map(r => {
     if (!r.found) {
