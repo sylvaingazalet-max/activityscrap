@@ -1,209 +1,97 @@
 /**
- * Predefined company configurations for job posting lookups
- * 
- * Each entry maps a company slug to its recruitment platform and API endpoint.
- * The URL patterns vary by platform (SmartRecruiters, Workable, Teamtailor, TalentView).
- * 
- * Filters applied:
- * - country: France (fr)
- * - region: Hauts-de-France
- * - limit: 200 postings max per company
+ * Event Sources Configuration
+ *
+ * Centralized configuration for scraping events from multiple official websites.
+ * Each source is configured with:
+ * - name: Human-readable name for logging and display
+ * - source: Organization name
+ * - url: Target URL to scrape (supports pagination via (offset) placeholder)
+ * - parser: Parser type to use ('jina' for JinaAI extraction)
+ * - timeout: Request timeout in milliseconds
+ *
+ * Usage:
+ * - New sources can be added here and will automatically be picked up by lookupSlugs()
+ * - The system handles pagination via (offset) placeholder in URLs
+ * - Each source is fetched concurrently (with rate limiting)
+ *
+ * Future Enhancement:
+ * - Load from environment variables or database for dynamic configuration
+ * - Support for authentication if sources require it
  */
 
 module.exports = {
   // ============================================================================
-  // SmartRecruiters Platform Companies
+  // Lille Events
   // ============================================================================
-  // SmartRecruiters uses JSON API with standardized endpoints
-  kiabi: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/kiabi/postings?country=fr&region=Hauts-de-France&limit=200'
+  // Main source for events in Lille, France
+  lille: {
+    name: 'Lille Events',
+    source: 'Ville de Lille (Official)',
+    url: 'https://www.lille.fr/Evenements/(offset)/0',
+    parser: 'jina',
+    timeout: 10000,
+    enabled: true,
+    description: 'Official city events from Lille municipality'
   },
-  boulanger: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/boulanger/postings?country=fr&region=Hauts-de-France&limit=200'
+
+  // Additional offset for pagination testing
+  lilleOffset10: {
+    name: 'Lille Events (Page 2)',
+    source: 'Ville de Lille (Official)',
+    url: 'https://www.lille.fr/Evenements/(offset)/10',
+    parser: 'jina',
+    timeout: 10000,
+    enabled: false, // Set to true to enable pagination
+    description: 'Official city events from Lille municipality (page 2, offset 10)'
   },
-  inpost: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/inpost/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  bricorama: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/bricorama/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  sgs: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/SGS/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  soprasteria: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/SopraSteria1/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  hmgroup: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/HMGroup/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  inetum: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Inetum2/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  keyence: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/KEYENCEFRANCE/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  amplhire: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/AmplHire/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  expeditors: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Expeditors/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  voyageprive: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/VoyagePriv/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  rituals: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Rituals1/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  covea: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/COVEA1/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  teamwork: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/TeamworkCorporate/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  spiebatignolles: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Spie-batignolles/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  evoriel: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/EVORIEL/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  courir: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Courir/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  accorhotels: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/AccorHotel/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  mazars: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/MAZARS/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  lapeyre: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/LAPEYRE/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  alten: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/ALTEN/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  nexton: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/NEXTON/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  citech: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/CITECH/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  kaufmanbroad: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/KaufmanBroad/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  loxam: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Loxam/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  acton: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/ACT-ON/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  artelia: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Artelia/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  nexity: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Nexity/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  lesaffre: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Lesaffre/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  mousquetaires: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/GroupementMousquetaires/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  veolia: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/VeoliaEnvironnementSA/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  meilleurtaux: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Meilleurtaux/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  advens: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/ADVENS/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  xplor: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Xplor/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  devoteam: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Devoteam/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  sia: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Sia/postings?country=fr&region=Hauts-de-France&limit=200'
-  },
-  magellan: {
-    platform: 'SmartRecruiters',
-    url: 'https://api.smartrecruiters.com/v1/companies/Magellan/postings?country=fr&region=Hauts-de-France&limit=200'
+
+  lilleOffset20: {
+    name: 'Lille Events (Page 3)',
+    source: 'Ville de Lille (Official)',
+    url: 'https://www.lille.fr/Evenements/(offset)/20',
+    parser: 'jina',
+    timeout: 10000,
+    enabled: false, // Set to true to enable pagination
+    description: 'Official city events from Lille municipality (page 3, offset 20)'
   },
 
   // ============================================================================
-  // Workable Platform Companies
+  // Future Event Sources (Templates for expansion)
   // ============================================================================
-  // Workable uses its own JSON API with different response structure
-  exotec: {
-    platform: 'Workable',
-    url: 'https://apply.workable.com/api/v1/widget/accounts/exotec?details=false'
+  // These are template configurations ready to be enabled when sources are added
+
+  // Paris Events - Template
+  /*
+  paris: {
+    name: 'Paris Events',
+    source: 'Ville de Paris (Official)',
+    url: 'https://www.paris.fr/pages/evenements-loisirs-58',
+    parser: 'jina',
+    timeout: 10000,
+    enabled: false,
+    description: 'Official city events from Paris municipality'
   },
 
-  // ============================================================================
-  // Teamtailor Platform Companies
-  // ============================================================================
-  // Teamtailor provides RSS feeds for job postings
-  adeo: {
-    platform: 'Teamtailor',
-    url: 'https://adeo.teamtailor.com/jobs.rss'
-  },
-  norauto: {
-    platform: 'Teamtailor',
-    url: 'https://norauto.teamtailor.com/jobs.rss'
-  },
-  ankama: {
-    platform: 'Teamtailor',
-    url: 'https://ankama.teamtailor.com/jobs.rss'
+  // Brussels Events - Template
+  brussels: {
+    name: 'Bruxelles Events',
+    source: 'Ville de Bruxelles (Official)',
+    url: 'https://www.bruxelles.be/agenda-des-activites',
+    parser: 'jina',
+    timeout: 10000,
+    enabled: false,
+    description: 'Official city events from Brussels municipality'
   },
 
-  // ============================================================================
-  // TalentView Platform Companies
-  // ============================================================================
-  // TalentView uses a custom API with location-based parameters
-  jules: {
-    platform: 'TalentView',
-    url: 'https://api.talentview.io/funnel/v2/companies/jules-recrutement/campaigns?company_website_id=1668&display_mode=list&location[lat]=50.624378&location[lon]=3.0678588&location[city]=Lille&location[iso_country]=FR&distance=50&offset_start=1'
+  // Antwerp Events - Template
+  antwerp: {
+    name: 'Antwerpen Events',
+    source: 'Stad Antwerpen (Official)',
+    url: 'https://www.antwerpen.be/agenda',
+    parser: 'jina',
+    timeout: 10000,
+    enabled: false,
+    description: 'Official city events from Antwerp municipality'
   },
-  laredoute: {
-    platform: 'TalentView',
-    url: 'https://api.talentview.io/funnel/v2/companies/laredoute-talent/campaigns?company_website_id=2261&display_mode=list&location[lat]=50.624378&location[lon]=3.0678588&location[city]=Lille&location[iso_country]=FR&distance=50&offset_start=1'
-  }
+  */
 };

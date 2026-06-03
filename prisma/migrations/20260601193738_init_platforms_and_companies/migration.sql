@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "platforms" (
+/*CREATE TABLE "platforms" (
     "id" BIGSERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -23,3 +23,4 @@ CREATE UNIQUE INDEX "platforms_name_key" ON "platforms"("name");
 
 -- AddForeignKey
 ALTER TABLE "companies" ADD CONSTRAINT "companies_platform_id_fkey" FOREIGN KEY ("platform_id") REFERENCES "platforms"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+*/

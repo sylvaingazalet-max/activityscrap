@@ -28,63 +28,14 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔍 JobFinder AI</h1>
+        <h1>🔍 Event finder AI</h1>
         
         <div class="section">
             <label for="prompt">Votre profil et recherche :</label>
             <textarea id="prompt" placeholder="Ex: Je suis un développeur Fullstack spécialisé en Node.js et React avec 5 ans d'expérience. Je recherche des postes en télétravail ou à Lille..."></textarea>
         </div>
 
-        <div class="section">
-            <label>Entreprises à cibler :</label>
-            <div class="company-grid">
-                <label class="company-option"><input type="checkbox" name="company" value="kiabi" checked> Kiabi</label>
-                <label class="company-option"><input type="checkbox" name="company" value="exotec" checked> Exotec</label>
-                <label class="company-option"><input type="checkbox" name="company" value="boulanger" checked> Boulanger</label>
-                <label class="company-option"><input type="checkbox" name="company" value="inpost" checked> Inpost</label>
-                <label class="company-option"><input type="checkbox" name="company" value="adeo" checked> Adeo</label>
-                <label class="company-option"><input type="checkbox" name="company" value="norauto" checked> Norauto</label>
-                <label class="company-option"><input type="checkbox" name="company" value="ankama" checked> Ankama</label>
-                <label class="company-option"><input type="checkbox" name="company" value="jules" checked> Jules</label>
-                <label class="company-option"><input type="checkbox" name="company" value="laredoute" checked> La Redoute</label>
-                <label class="company-option"><input type="checkbox" name="company" value="bricorama" checked> Bricorama</label>
-                <label class="company-option"><input type="checkbox" name="company" value="sgs" checked> SGS</label>
-                <label class="company-option"><input type="checkbox" name="company" value="soprasteria" checked> Sopra Steria</label>
-                <label class="company-option"><input type="checkbox" name="company" value="hmgroup" checked> H&M Group</label>
-                <label class="company-option"><input type="checkbox" name="company" value="inetum" checked> Inetum</label>
-                <label class="company-option"><input type="checkbox" name="company" value="keyence" checked> Keyence</label>
-                <label class="company-option"><input type="checkbox" name="company" value="amplhire" checked> Amplhire</label>
-                <label class="company-option"><input type="checkbox" name="company" value="expeditors" checked> Expeditors</label>
-                <label class="company-option"><input type="checkbox" name="company" value="voyageprive" checked> Voyage Privé</label>
-                <label class="company-option"><input type="checkbox" name="company" value="rituals" checked> Rituals</label>
-                <label class="company-option"><input type="checkbox" name="company" value="covea" checked> Covéa</label>
-                <label class="company-option"><input type="checkbox" name="company" value="teamwork" checked> Teamwork</label>
-                <label class="company-option"><input type="checkbox" name="company" value="spiebatignolles" checked> Spie Batignolles</label>
-                <label class="company-option"><input type="checkbox" name="company" value="evoriel" checked> Evoriel</label>
-                <label class="company-option"><input type="checkbox" name="company" value="courir" checked> Courir</label>
-                <label class="company-option"><input type="checkbox" name="company" value="accorhotels" checked> Accor Hotels</label>
-                <label class="company-option"><input type="checkbox" name="company" value="mazars" checked> Mazars</label>
-                <label class="company-option"><input type="checkbox" name="company" value="lapeyre" checked> Lapeyre</label>
-                <label class="company-option"><input type="checkbox" name="company" value="alten" checked> Alten</label>
-                <label class="company-option"><input type="checkbox" name="company" value="nexton" checked> Nexton</label>
-                <label class="company-option"><input type="checkbox" name="company" value="citech" checked> Citech</label>
-                <label class="company-option"><input type="checkbox" name="company" value="kaufmanbroad" checked> Kaufman & Broad</label>
-                <label class="company-option"><input type="checkbox" name="company" value="loxam" checked> Loxam</label>
-                <label class="company-option"><input type="checkbox" name="company" value="acton" checked> Act-on</label>
-                <label class="company-option"><input type="checkbox" name="company" value="artelia" checked> Artelia</label>
-                <label class="company-option"><input type="checkbox" name="company" value="nexity" checked> Nexity</label>
-                <label class="company-option"><input type="checkbox" name="company" value="lesaffre" checked> Lesaffre</label>
-                <label class="company-option"><input type="checkbox" name="company" value="mousquetaires" checked> Mousquetaires</label>
-                <label class="company-option"><input type="checkbox" name="company" value="veolia" checked> Veolia</label>
-                <label class="company-option"><input type="checkbox" name="company" value="meilleurtaux" checked> Meilleurtaux</label>
-                <label class="company-option"><input type="checkbox" name="company" value="advens" checked> Advens</label>
-                <label class="company-option"><input type="checkbox" name="company" value="xplor" checked> Xplor</label>
-                <label class="company-option"><input type="checkbox" name="company" value="devoteam" checked> Devoteam</label>
-                <label class="company-option"><input type="checkbox" name="company" value="sia" checked> SIA</label>
-                <label class="company-option"><input type="checkbox" name="company" value="magellan" checked> Magellan</label>
-            </div>
-        </div>
-
+        
         <button id="searchBtn">Analyser les opportunités</button>
 
         <div id="status"></div>
@@ -102,7 +53,6 @@
                                   .map(cb => cb.value);
 
             if (!prompt) return alert("Veuillez décrire ce que vous recherchez.");
-            if (companies.length === 0) return alert("Veuillez sélectionner au moins une entreprise.");
 
             // UI Reset
             searchBtn.disabled = true;

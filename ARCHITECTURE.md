@@ -1,31 +1,40 @@
-```
-# JobFinder Architecture
+# Lille Events Scraper Architecture
 
 ## Project Overview
 
-JobFinder is a job aggregation service that:
-1. Searches multiple recruitment platforms for job postings
-2. Aggregates results with company information
-3. Uses AI (Google Gemini) to generate insights or answers based on job data
+Lille Events Scraper is an event aggregation service that:
+1. Scrapes events from multiple configured official city websites using JinaAI
+2. Aggregates and parses event data into structured format
+3. Uses AI (Google Gemini) to generate personalized event recommendations based on user preferences
+
+## Key Features
+
+- **Multi-source support**: Configured to scrape from multiple event sources (currently Lille, extensible to other cities)
+- **Concurrent fetching**: Fetches from multiple sources concurrently with rate limiting
+- **Comprehensive logging**: Structured JSON logging throughout the application for debugging and monitoring
+- **Database ready**: Prisma ORM configured with PostgreSQL for future data persistence
+- **Streaming responses**: Server-Sent Events (SSE) for real-time progress updates to clients
 
 ## Directory Structure
 
 ```
-JobFinder/
+Lille Events Scraper/
 ├── api/                          # Serverless API endpoints
 │   └── gemini.js                 # POST /api/gemini - Main API handler
 │
 ├── services/                     # Business logic services
-│   ├── platformLookup.js         # Platform job search service
+│   ├── platformLookup.js         # Event fetching service (multi-source support)
 │   └── geminiClient.js           # Gemini AI client wrapper
 │
 ├── config/                       # Configuration files
-│   └── companies.js              # Predefined company platform configs
+│   └── companies.js              # Event sources configuration (extensible)
 │
-├── lib/                          # Utility functions
-│   ├── http.js                   # Fetch with timeout support
+├── lib/                          # Utility functions and helpers
+│   ├── logger.js                 # Structured logging module
+│   ├── http.js                   # Fetch with JinaAI support and timeout
 │   ├── validators.js             # Input validation helpers
-│   └── parsers.js                # Job offer parsing for different formats
+│   ├── parsers.js                # Event data parsing
+│   └── prismaClient.js           # Database client initialization and management
 │
 ├── prisma/                       # Database configuration (Prisma ORM)
 │   ├── schema.prisma             # Database schema
@@ -38,32 +47,37 @@ JobFinder/
 
 ## Core Workflows
 
-### 1. Job Posting Lookup Flow
+### 1. Event Scraping Flow (Multi-source)
 
 ```
 POST /api/gemini
     ↓
-[Request Validation]
+[Request Validation] - validators.js
     ↓
-[Optional: Company Job Search]
-    ├─→ platformLookup.lookupSlugs()
-    ├─→ Normalize company slugs
-    ├─→ Process in batches (to avoid rate limits)
-    │   ├─→ probeUrl() - Test each company's URL
-    │   ├─→ Validate response content
-    │   └─→ Parse job offers (JSON/RSS)
-    ├─→ extractOffersFromBody() - Platform-specific parsing
-    │   ├─→ JSON parsing (SmartRecruiters, Workable, TalentView)
-    │   ├─→ RSS parsing (Teamtailor)
-    │   └─→ Fallback generic text extraction
-    └─→ Return formatted results + accumulated job data
+[Fetch Events from Multiple Sources] - platformLookup.js
+    ├─→ Read enabled sources from config/companies.js
+    ├─→ Fetch events concurrently (with rate limiting)
+    │   ├─→ For each enabled source:
+    │   ├─→ Use JinaAI to extract clean markdown content
+    │   ├─→ Call https://r.jina.ai/{url}
+    │   └─→ Log progress and results
+    ├─→ Parse events using lib/parsers.js
+    │   ├─→ Try markdown parsing first
+    │   ├─→ Fallback to generic text parsing
+    │   └─→ Aggregate events from all sources
+    └─→ Return formatted events data with source metadata
     ↓
-[Generate AI Response (optional)]
-    ├─→ generateContent() - Call Gemini API
-    └─→ Stream results via Server-Sent Events
+[Aggregate Events from All Sources]
+    ├─→ Combine events from successful fetches
+    ├─→ Track which sources succeeded/failed
+    └─→ Format for AI prompt
+    ↓
+[Generate AI Response] - geminiClient.js
+    ├─→ Call Gemini API with user prompt + event data
+    └─→ Return personalized recommendations
     ↓
 [Send SSE Response]
-    └─→ event: 'progress', 'result', 'error'
+    └─→ Stream progress and results to client
 ```
 
 ### 2. Request Format
@@ -73,12 +87,7 @@ POST /api/gemini
 Content-Type: application/json
 
 {
-  "prompt": "Find senior developer jobs in the region",
-  "companies": [
-    "kiabi",
-    "exotec",
-    "ankama"
-  ]
+  "prompt": "I'm interested in concerts and outdoor activities"
 }
 ```
 
@@ -86,13 +95,16 @@ Content-Type: application/json
 
 ```
 event: progress
-data: {"type":"progress","data":{"slug":"kiabi","state":"looking","platform":"auto-detect"}}
+data: {"type":"progress","data":{"state":"starting","sourceCount":2}}
 
 event: progress
-data: {"type":"progress","data":{"slug":"kiabi","state":"found","platform":"SmartRecruiters","url":"https://..."}}
+data: {"type":"progress","data":{"state":"fetching","source":"Lille Events"}}
+
+event: progress
+data: {"type":"progress","data":{"state":"found","source":"Lille Events","eventCount":45}}
 
 event: result
-data: {"type":"result","data":{"result":"...generated content...","raw":{...}}}
+data: {"type":"result","data":{"result":"...personalized recommendations...","raw":{...}}}
 
 event: error (if failed)
 data: {"type":"error","data":{"error":"Error message"}}
@@ -102,7 +114,168 @@ data: {"type":"error","data":{"error":"Error message"}}
 
 ### API Route (api/gemini.js)
 - HTTP POST endpoint handler
-- Validates incoming payload
+- Validates incoming payload with comprehensive error handling
+- Orchestrates event fetching and AI generation
+- Implements Server-Sent Events for streaming responses
+- Comprehensive logging at all stages
+
+### Platform Lookup Service (services/platformLookup.js)
+- Fetches events from all enabled configured sources
+- Manages concurrent requests with rate limiting
+- Provides progress callbacks for real-time updates
+- Handles failures gracefully with fallback to remaining sources
+- Aggregates results from multiple sources
+- Extensive logging for debugging
+
+### Gemini Client (services/geminiClient.js)
+- Wraps Google's Generative AI API
+- Handles API authentication and error handling
+- Configurable model selection via environment variables
+- Comprehensive error logging
+
+### Event Parsers (lib/parsers.js)
+- Markdown parsing (optimized for JinaAI extracted content)
+- Generic text parsing (fallback for unstructured content)
+- Event validation and filtering
+- Detailed logging of parsing process
+
+### HTTP Utilities (lib/http.js)
+- Timeout-enabled fetch wrapper
+- JinaAI integration for content extraction
+- Automatic User-Agent and header management
+
+### Input Validators (lib/validators.js)
+- Payload validation with error logging
+- Type checking and format validation
+- Clear error messages
+
+### Logger (lib/logger.js)
+- Structured JSON logging
+- Context-aware logging with scoped loggers
+- Multiple log levels (INFO, ERROR, WARN, DEBUG)
+- Automatic timestamp and formatting
+
+### Prisma Client (lib/prismaClient.js)
+- Lazy initialization of Prisma client
+- Connection status tracking
+- Query logging support
+- Maintained for future database operations
+
+## Configuration
+
+### Event Sources (config/companies.js)
+
+Event sources are configured with:
+```javascript
+{
+  name: 'Display name',
+  source: 'Organization name',
+  url: 'https://example.com/events',
+  parser: 'jina',
+  timeout: 10000,
+  enabled: true,
+  description: 'Source description'
+}
+```
+
+**Currently Enabled Sources:**
+- Lille Events: https://www.lille.fr/Evenements/
+
+**Disabled but Configured (ready to enable):**
+- Lille Events Page 2 and 3 (pagination support)
+
+**Templates Available (commented out):**
+- Paris Events
+- Brussels Events
+- Antwerp Events
+
+**To Add New Sources:**
+1. Add configuration object to `config/companies.js`
+2. Set `enabled: true`
+3. The system will automatically include it in lookups
+
+### Environment Variables
+
+```bash
+# Gemini API Configuration
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-3.5-flash  # Optional, defaults to gemini-3.5-flash
+
+# Database Configuration (Prisma)
+POSTGRES_PRISMA_URL=postgresql://user:password@host/dbname
+POSTGRES_URL_NON_POOLING=postgresql://user:password@host/dbname
+
+# Development
+NODE_ENV=production|development  # Default: production
+DEBUG=true|false  # Enable debug logging
+RETURN_DEBUG_PROMPT=true|false  # Return constructed prompt instead of calling API
+ALLOW_INSECURE_TLS=true|false  # Allow insecure TLS in development (default: false)
+```
+
+## Logging
+
+The application uses structured JSON logging throughout:
+
+```json
+{
+  "timestamp": "2026-06-02T10:30:45.123Z",
+  "level": "INFO",
+  "context": "services/platformLookup",
+  "message": "Lookup starting",
+  "data": { "sourceCount": 2 }
+}
+```
+
+**Log Levels:**
+- **INFO**: Normal operation milestones
+- **WARN**: Non-critical issues (failed source, empty results)
+- **ERROR**: Critical failures (API errors, validation errors)
+- **DEBUG**: Detailed diagnostic information (only in development)
+
+## Database Integration
+
+Prisma ORM is configured but not actively used yet. It's ready for:
+- Storing scraped events
+- Caching results
+- Tracking user preferences
+- Analytics and monitoring
+
+Database schema includes:
+- `Platform` model for event sources
+- `Company` model for organizations
+- Ready to extend with `Event`, `User`, `Recommendation` models
+
+## Extending the System
+
+### Adding a New Event Source
+1. Add configuration to `config/companies.js`
+2. Set `enabled: true`
+3. Optionally customize parser if needed
+4. System automatically picks it up on next request
+
+### Modifying Event Parser
+1. Update parsing logic in `lib/parsers.js`
+2. Add logging for debugging
+3. Extend event object structure if needed
+
+### Adding Database Features
+1. Update `prisma/schema.prisma` with new models
+2. Run `prisma migrate dev --name <migration_name>`
+3. Use `lib/prismaClient.js` to access database
+4. Add logging for queries
+
+### Adding New AI Features
+1. Create new service in `services/`
+2. Use existing patterns for logging and error handling
+3. Wire into `api/gemini.js` handler
+
+## Performance Considerations
+
+- **Concurrent Fetching**: Max 3 concurrent requests per batch to avoid overwhelming sources
+- **Event Limit**: Truncated to 50 events in AI prompt for token efficiency
+- **Total Event Extraction**: Limited to 200 events per source
+- **Timeouts**: 8-10 seconds per source fetch, 200 seconds for AI generation
+- **Response Streaming**: SSE allows real-time progress updates without blocking
 - Orchestrates platform lookup and AI generation
 - Streams results via Server-Sent Events (SSE)
 

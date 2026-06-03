@@ -1,7 +1,7 @@
 {
-  "name": "jobfinder",
+  "name": "lille-events-scraper",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI-powered event discovery service for Lille",
   "main": "index.js",
   "scripts": {
     "build": "echo \"build complete\"",
@@ -15,6 +15,7 @@
     "prisma": "^6.19.3"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3"
+    "@prisma/client": "^6.19.3",
+    "dotenv": "^17.4.2"
   }
 }

@@ -1,6 +1,6 @@
-# JobFinder
+# Lille Events Scraper
 
-A job aggregation service that searches multiple recruitment platforms, parses job postings, and uses AI to generate insights.
+An event aggregation service that scrapes events from Lille official website, parses event data, and uses AI to help users discover events tailored to their preferences.
 
 ## Quick Start
 
@@ -8,6 +8,7 @@ A job aggregation service that searches multiple recruitment platforms, parses j
 
 - Node.js 16+ (for AbortController support)
 - Google Gemini API key
+- JinaAI API (for content extraction)
 
 ### Installation
 
@@ -26,7 +27,6 @@ GEMINI_API_KEY=your-google-gemini-api-key
 # Optional
 GEMINI_MODEL=gemini-3.5-flash
 NODE_ENV=development
-ALLOW_INSECURE_TLS=false
 ```
 
 ### Running Locally
@@ -43,7 +43,7 @@ node api/gemini.js
 
 ### POST /api/gemini
 
-Search for job postings and generate AI-powered insights.
+Search for events in Lille and generate AI-powered personalized recommendations.
 
 **Request:**
 
@@ -51,8 +51,7 @@ Search for job postings and generate AI-powered insights.
 curl -X POST http://localhost:3000/api/gemini \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Find senior developer positions in our region",
-    "companies": ["kiabi", "exotec", "ankama"]
+    "prompt": "I'm interested in concerts and outdoor events"
   }' \
   --no-buffer
 ```
@@ -61,8 +60,7 @@ curl -X POST http://localhost:3000/api/gemini \
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `prompt` | string | ✓ | Base prompt for AI generation |
-| `companies` | array or string | ✗ | Company slugs to search (array or newline-separated) |
+| `prompt` | string | ✓ | User preferences or interests for event recommendations |
 
 **Response (Server-Sent Events):**
 
@@ -70,33 +68,23 @@ The API streams responses as Server-Sent Events:
 
 ```
 event: progress
-data: {"type":"progress","data":{"slug":"kiabi","state":"looking"}}
+data: {"type":"progress","data":{"state":"fetching","source":"Lille Events"}}
 
 event: progress
-data: {"type":"progress","data":{"slug":"kiabi","state":"found","platform":"SmartRecruiters"}}
+data: {"type":"progress","data":{"state":"found","eventCount":45}}
 
 event: result
-data: {"type":"result","data":{"result":"...generated content..."}}
+data: {"type":"result","data":{"result":"...personalized recommendations..."}}
 
 event: error (if applicable)
 data: {"type":"error","data":{"error":"..."}}
 ```
 
-## Supported Companies
+## Data Source
 
-The system has predefined configurations for 40+ companies across 4 recruitment platforms:
+The system scrapes events from the official Lille city website:
 
-### SmartRecruiters
-Boulanger, Bricorama, SGS, SopraSteria, HMGroup, Inetum, KEYENCE, AmplHire, Expeditors, VoyagePriv, Rituals, COVEA, TeamworkCorporate, SPIE-Batignolles, EVORIEL, Courir, AccorHotel, MAZARS, LAPEYRE, ALTEN, NEXTON, CITECH, KaufmanBroad, Loxam, ACT-ON, Artelia, Nexity, Lesaffre, GroupementMousquetaires, VeoliaEnvironnement, Meilleurtaux, ADVENS, Xplor, Devoteam, Sia, Magellan
-
-### Workable
-Exotec
-
-### Teamtailor
-ADEO, Norauto, Ankama
-
-### TalentView
-Jules, La Redoute
+- **Source**: https://www.lille.fr/Evenements/
 
 ### Adding New Companies
 
