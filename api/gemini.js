@@ -13,7 +13,7 @@
  *   prompt: string (required) - User preferences for event recommendations
  * }
  *
- * Response Format (SSE):
+ * Response Format (SSE): 
  * event: progress -> { type: 'progress', data: { state, source?, eventCount? } }
  * event: result -> { type: 'result', data: { result: string, raw: any } }
  * event: error -> { type: 'error', data: { error: string } }
