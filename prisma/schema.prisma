@@ -1,33 +1,57 @@
-// 1. On garde ton générateur et ton dossier de sortie personnalisé !
 generator client {
   provider = "prisma-client-js"
-  output   = "../lib/generated/prisma"
 }
 
-// 2. On met à jour la connexion pour pointer vers tes 2 nouvelles variables Supabase
 datasource db {
   provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL")
+  url       = env("DATABASE_URL")
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-// 3. On ajoute tes tables pour les plateformes et les entreprises
-model Platform {
-  id        BigInt    @id @default(autoincrement())
-  name      String    @unique
-  companies Company[]
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@map("platforms")
-}
-
-model Company {
-  id         BigInt   @id @default(autoincrement())
-  name       String
-  url        String
-  platformId BigInt   @map("platform_id")
-  platform   Platform @relation(fields: [platformId], references: [id])
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  @@map("companies")
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model events {
+  Identifiant                              BigInt                 @id
+  Titre___FR                               String?                @map("Titre - FR")
+  Chap____FR                               String?                @map("Chapô - FR")
+  Description_longue___FR                  String?                @map("Description longue - FR")
+  Permalien                                String?
+  Mots_cl_s___FR                           String?                @map("Mots clés - FR")
+  R_sum__horaires___FR                     String?                @map("Résumé horaires - FR")
+  Horaires_ISO                             String?                @map("Horaires ISO")
+  Horaires_d_taill_s___FR                  String?                @map("Horaires détaillés - FR")
+  Premi_re_date___FR                       String?                @map("Première date - FR")
+  Derni_re_date___FR                       String?                @map("Dernière date - FR")
+  Conditions_de_participation__tarifs___FR String?                @map("Conditions de participation, tarifs - FR")
+  Accessibilit____FR                       String?                @map("Accessibilité - FR")
+  Cr_ation_de_la_fiche___FR                String?                @map("Création de la fiche - FR")
+  Derni_re_mise___jour___FR                String?                @map("Dernière mise à jour - FR")
+  Image                                    String?
+  Lien_d_acc_s                             String?                @map("Lien d'accès")
+  Outils_d_inscription                     String?                @map("Outils d'inscription")
+  En_une                                   String?                @map("En une")
+  ge_du_public_cibl_                       String?                @map("Âge du public ciblé")
+  Statut                                   String?
+  Cr_dits                                  String?                @map("Crédits")
+  Type_d__v_nement                         String?                @map("Type d'événement")
+  Etiquette                                String?
+  D_tail_des_tarifs                        String?                @map("Détail des tarifs")
+  Mode_de_participation                    String?                @map("Mode de participation")
+  Lieu__Identifiant                        BigInt?                @map("Lieu: Identifiant")
+  Lieu__Nom                                String?                @map("Lieu: Nom")
+  Lieu__Adresse                            String?                @map("Lieu: Adresse")
+  Lieu__R_gion                             String?                @map("Lieu: Région")
+  Lieu__D_partement                        String?                @map("Lieu: Département")
+  Lieu__Ville                              String?                @map("Lieu: Ville")
+  Lieu__Arrondissement                     String?                @map("Lieu: Arrondissement")
+  Lieu__Quartier                           String?                @map("Lieu: Quartier")
+  Lieu__Code_postal                        String?                @map("Lieu: Code postal")
+  Lieu__Code_INSEE                         String?                @map("Lieu: Code INSEE")
+  Lieu__Latitude                           Float?                 @map("Lieu: Latitude")
+  Lieu__Longitude                          Float?                 @map("Lieu: Longitude")
+  Lieu__Description___FR                   String?                @map("Lieu: Description - FR")
+  Lieu__Site_internet                      String?                @map("Lieu: Site internet")
+  Lieu__Acc_s___FR                         String?                @map("Lieu: Accès - FR")
+  Label                                    String?
+  tat                                      String?                @map("État")
+  embedding                                Unsupported("vector")?
 }

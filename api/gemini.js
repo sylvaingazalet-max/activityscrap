@@ -27,19 +27,18 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 const { validatePayload } = require('../lib/validators');
-const { lookupSlugs } = require('../services/platformLookup');
 const { generateContent } = require('../services/geminiClient');
+const { getPrismaClient } = require('../lib/prismaClient');
 const logger = require('../lib/logger');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Check for API key
+const apiKey = process.env.GEMINI_API_KEY;
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // ============================================================================
 // Constants
 // ============================================================================
-
-// Configuration for company lookups
-const COMPANY_LOOKUP_CONFIG = {
-  concurrency: 3,           // Max concurrent requests per batch
-  timeout: 8000             // Request timeout in milliseconds
-};
 
 // Configuration for AI API
 const AI_API_CONFIG = {
@@ -102,12 +101,63 @@ module.exports = async (req, res) => {
     'Connection': 'keep-alive'
   });
 
-  const { prompt, companies } = req.body || {};
+  const { prompt } = req.body || {};
+
+  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse de votre demande...' } });
+
+    const prisma = await getPrismaClient();
+
+  // 1. EXTRACT FILTERS USING GEMINI
+  let filters = {};
+  const todayStr = new Date().toISOString().split('T')[0]; // e.g. "2026-06-04"
+  const currentYear = new Date().getFullYear();
+  try {
+    contextLog.info('Extracting filters from prompt', { prompt });
+    const extractionPrompt = `Tu es un assistant de recherche spécialisé dans l'extraction de critères structurés à partir de requêtes d'utilisateurs cherchant des événements à Lille.
+Aujourd'hui nous sommes le ${todayStr}. L'année actuelle est ${currentYear}.
+
+Voici la requête de l'utilisateur :
+"${prompt}"
+
+Analyse cette requête et renvoie UNIQUE-MENT un objet JSON respectant scrupuleusement la structure suivante (sans aucun bloc Markdown \`\`\`json ou texte explicatif supplémentaire) :
+{
+  "startDate": "YYYY-MM-DD" (ou null),
+  "endDate": "YYYY-MM-DD" (ou null),
+  "neighborhoods": ["NomQuartier1", "NomQuartier2"] (liste de quartiers de Lille s'ils sont explicités, sinon un tableau vide. Exemples de quartiers valides : "Vieux-Lille", "Lille-Centre", "Wazemmes", "Fives", "Lille-Sud", "Vauban-Esquermes", "Saint-Maurice Pellevoisin", "Bois-Blancs", "Faubourg de Béthune", "Moulins"),
+  "isFree": true/false (ou null si non précisé),
+  "ageMin": integer (ou null si non précisé),
+  "eventType": "Type" (ou null. Exemples de types d'événements fréquents: "Concert", "Spectacle", "Fête / festival", "Stages et ateliers", "Visite", "Nature / environnement", "Rencontre / conférence / débat")
+}
+
+Note : Si la requête parle de "ce week-end", calcule la date de samedi et dimanche par rapport à aujourd'hui (${todayStr}). Si elle parle de "ce soir", calcule la date d'aujourd'hui. Si la requête contient une date ou période, convertis-la proprement au format YYYY-MM-DD.
+Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`;
+
+    const modelForExtraction = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const extractionResult = await modelForExtraction.generateContent(extractionPrompt);
+    const extractionText = extractionResult.response.text().trim();
+
+    // Clean potential markdown wrappers if Gemini returned them
+    const cleanedText = extractionText.replace(/```json/g, '').replace(/```/g, '').trim();
+    filters = JSON.parse(cleanedText);
+    contextLog.info('Successfully extracted filters', { filters });
+  } catch (err) {
+    contextLog.error('Failed to extract filters from Gemini, falling back to empty filters', err);
+    filters = {
+      startDate: null,
+      endDate: null,
+      neighborhoods: [],
+      isFree: null,
+      ageMin: null,
+      eventType: null
+    };
+  }
+
+  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche et filtrage en base de données...', filters } });
+
   let finalPrompt = prompt;
 
-  contextLog.info('Request validated, starting event lookup', {
-    promptLength: prompt.length,
-    companiesRequested: companies
+  contextLog.info('Request validated, starting database lookup', {
+    promptLength: prompt.length
   });
 
   // =========================================================================
@@ -121,37 +171,61 @@ module.exports = async (req, res) => {
     contextLog.info('Local development mode - insecure TLS enabled');
   }
 
-  // =========================================================================
-  // Fetch events from configured sources using JinaAI
+    // =========================================================================
+  // Fetch events from Database (Prisma)
   // =========================================================================
   try {
-    // Define progress callback to stream updates to client
-    const onProgress = (event) => {
-      sendEvent(res, { type: 'progress', data: event });
-    };
+    contextLog.info('Fetching events based on extracted filters');
 
-    contextLog.info('Starting event lookup from configured sources');
+    // BUILD PRISMA WHERE CLAUSE
+    const whereClause = {};
 
-    // Fetch events using JinaAI from all configured sources
-    const { events, promptAppend } = await lookupSlugs(null, {
-      timeout: COMPANY_LOOKUP_CONFIG.timeout,
-      onProgress
+    if (filters.startDate) {
+      whereClause.Horaires_ISO = { contains: filters.startDate };
+    }
+
+    if (filters.neighborhoods && filters.neighborhoods.length > 0) {
+      whereClause.Lieu__Quartier = { in: filters.neighborhoods };
+    }
+
+    if (filters.isFree === true) {
+      whereClause.OR = [
+        { Conditions_de_participation__tarifs___FR: { contains: 'gratuit', mode: 'insensitive' } },
+        { Conditions_de_participation__tarifs___FR: { contains: 'libre', mode: 'insensitive' } },
+        { D_tail_des_tarifs: { contains: 'gratuit', mode: 'insensitive' } }
+      ];
+    } else if (filters.isFree === false) {
+       whereClause.NOT = [
+        { Conditions_de_participation__tarifs___FR: { contains: 'gratuit', mode: 'insensitive' } },
+        { Conditions_de_participation__tarifs___FR: { contains: 'libre', mode: 'insensitive' } }
+      ];
+    }
+
+    if (filters.eventType) {
+      whereClause.Type_d__v_nement = { contains: filters.eventType, mode: 'insensitive' };
+    }
+
+    const dbEvents = await prisma.events.findMany({
+      where: whereClause,
+      take: 15
     });
 
-    // Append event data to prompt
-    finalPrompt += promptAppend || '';
+    contextLog.info(`Successfully fetched ${dbEvents.length} events from database`);
 
-    contextLog.info('Event fetching completed successfully', {
-      eventsFound: events ? events.length : 0,
-      promptAppendLength: promptAppend ? promptAppend.length : 0
-    });
+    if (dbEvents.length > 0) {
+      // Safe stringification that handles BigInt values
+      const safeDbEventsStr = JSON.stringify(dbEvents, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+        2
+      );
+
+      finalPrompt += `\n\nVoici les événements correspondants trouvés dans la base de données. Formule une réponse personnalisée pour l'utilisateur en recommandant ces événements:\n${safeDbEventsStr}`;
+    } else {
+        finalPrompt += `\n\nAucun événement exact n'a été trouvé pour ces critères. Indique-le à l'utilisateur et donne-lui des conseils généraux liés à sa demande.`;
+    }
   } catch (err) {
-    contextLog.error('Event fetching failed', err);
-    finalPrompt += `\n\n⚠️ Warning: Could not fetch event data: ${err.message}\n`;
-    sendEvent(res, {
-      type: 'progress',
-      data: { state: 'warning', source: 'Events', message: `Partial failure: ${err.message}` }
-    });
+    contextLog.error('Failed to fetch events from database', err);
+    finalPrompt += `\n\n⚠️ Warning: Could not fetch database events: ${err.message}\n`;
   }
 
   // =========================================================================
@@ -165,7 +239,7 @@ module.exports = async (req, res) => {
     // Supprime espaces et guillemets éventuels (ex: "true" -> true)
     const cleaned = val.trim().toLowerCase().replace(/['"]/g, '');
     return cleaned === 'true' || cleaned === '1' || cleaned === 'yes';
-  };
+};
 
   const isDebugMode = isTruthy(process.env.RETURN_DEBUG_PROMPT) || isTruthy(process.env.DEBUG);
 
@@ -209,3 +283,4 @@ module.exports = async (req, res) => {
   contextLog.debug('Closing SSE stream');
   res.end();
 };
+

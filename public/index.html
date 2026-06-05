@@ -3,40 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JobFinder AI - Assistant de Recherche</title>
+    <title>Suggestions d'activités</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 20px; color: #333; }
-        .container { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; text-align: center; }
-        .section { margin-bottom: 25px; }
-        label { display: block; font-weight: bold; margin-bottom: 8px; }
-        textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; box-sizing: border-box; }
-        
-        .company-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
-        .company-option { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
-        .company-option input { cursor: pointer; }
-        
-        button { display: block; width: 100%; padding: 15px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
-        button:hover { background: #2980b9; }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
-
-        #status { margin-top: 20px; font-size: 14px; color: #7f8c8d; }
-        #results { margin-top: 20px; padding: 20px; background: #fdfdfd; border-left: 5px solid #3498db; border-radius: 4px; white-space: pre-wrap; display: none; }
-        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(52,152,219,.3); border-radius: 50%; border-top-color: #3498db; animation: spin 1s ease-in-out infinite; margin-right: 10px; vertical-align: middle; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 650px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            color: #222;
+            background-color: #fafafa;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid #eaeaea;
+        }
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #111;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #444;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            resize: vertical;
+            box-sizing: border-box;
+            font-size: 15px;
+            font-family: inherit;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #000;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: #111;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #333;
+        }
+        button:disabled {
+            background: #eaeaea;
+            color: #999;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        #results {
+            margin-top: 25px;
+            padding: 20px;
+            background: #fafafa;
+            border: 1px solid #eaeaea;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            display: none;
+            font-size: 15px;
+            color: #333;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: #000;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔍 Event finder AI</h1>
-        
+        <h1>Suggestions d'activités</h1>
         <div class="section">
-            <label for="prompt">Votre profil et recherche :</label>
-            <textarea id="prompt" placeholder="Ex: Je suis un développeur Fullstack spécialisé en Node.js et React avec 5 ans d'expérience. Je recherche des postes en télétravail ou à Lille..."></textarea>
+            <label for="prompt">Que souhaitez-vous faire ?</label>
+            <textarea id="prompt" placeholder="Ex : j'aimerai écouter de la musique avec des amis samedi soir"></textarea>
         </div>
 
-        
-        <button id="searchBtn">Analyser les opportunités</button>
+        <button id="searchBtn">Proposer des idées</button>
 
         <div id="status"></div>
         <div id="results"></div>
@@ -49,22 +124,19 @@
 
         searchBtn.onclick = async () => {
             const prompt = document.getElementById('prompt').value.trim();
-            const companies = Array.from(document.querySelectorAll('input[name="company"]:checked'))
-                                  .map(cb => cb.value);
-
-            if (!prompt) return alert("Veuillez décrire ce que vous recherchez.");
+            if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
 
             // UI Reset
             searchBtn.disabled = true;
             resultsDiv.style.display = 'none';
             resultsDiv.textContent = '';
-            statusDiv.innerHTML = '<div class="loading-spinner"></div> Connexion au moteur de recherche...';
+            statusDiv.innerHTML = '<div class="loading-spinner"></div> Connexion en cours...';
 
             try {
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, companies })
+                    body: JSON.stringify({ prompt })
                 });
 
                 const reader = response.body.getReader();
@@ -81,9 +153,9 @@
                         if (line.startsWith('data: ')) {
                             const event = JSON.parse(line.substring(6));
                             if (event.type === 'progress') {
-                                statusDiv.innerHTML = `<div class="loading-spinner"></div> Analyse en cours : <strong>${event.data.slug}</strong>...`;
+                                statusDiv.innerHTML = `<div class="loading-spinner"></div> Recherche d'idées en cours...`;
                             } else if (event.type === 'result') {
-                                statusDiv.textContent = '✅ Analyse terminée !';
+                                statusDiv.textContent = 'Suggestions générées !';
                                 resultsDiv.style.display = 'block';
                                 resultsDiv.textContent = event.data.result;
                             } else if (event.type === 'error') {
@@ -93,7 +165,7 @@
                     }
                 }
             } catch (err) {
-                statusDiv.textContent = "❌ Erreur de connexion au serveur.";
+                statusDiv.textContent = "❌ Erreur de connexion.";
                 console.error(err);
             } finally {
                 searchBtn.disabled = false;
@@ -102,3 +174,4 @@
     </script>
 </body>
 </html>
+
