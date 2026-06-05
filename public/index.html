@@ -139,19 +139,61 @@
                     body: JSON.stringify({ prompt })
                 });
 
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errMsg = errorText;
+                    try {
+                        const errJson = JSON.parse(errorText);
+                        errMsg = errJson.error || errorText;
+                    } catch (_) {}
+                    throw new Error(errMsg || `HTTP error! Status: ${response.status}`);
+                }
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+
+                    // The last item in lines is the potentially incomplete line (buffer)
+                    buffer = lines.pop() || '';
 
                     for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const event = JSON.parse(line.substring(6));
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine) continue;
+
+                        if (trimmedLine.startsWith('data: ')) {
+                            const dataStr = trimmedLine.substring(6).trim();
+                            try {
+                                const event = JSON.parse(dataStr);
+                                if (event.type === 'progress') {
+                                    statusDiv.innerHTML = `<div class="loading-spinner"></div> Recherche d'idées en cours...`;
+                                } else if (event.type === 'result') {
+                                    statusDiv.textContent = 'Suggestions générées !';
+                                    resultsDiv.style.display = 'block';
+                                    resultsDiv.textContent = event.data.result;
+                                } else if (event.type === 'error') {
+                                    statusDiv.textContent = '❌ Erreur : ' + event.data.error;
+                                }
+                            } catch (parseErr) {
+                                console.error('Error parsing SSE event:', parseErr, dataStr);
+                            }
+                        }
+                    }
+                }
+
+                // Process any leftover content in the buffer
+                if (buffer.trim()) {
+                    const trimmedLine = buffer.trim();
+                    if (trimmedLine.startsWith('data: ')) {
+                        const dataStr = trimmedLine.substring(6).trim();
+                        try {
+                            const event = JSON.parse(dataStr);
                             if (event.type === 'progress') {
                                 statusDiv.innerHTML = `<div class="loading-spinner"></div> Recherche d'idées en cours...`;
                             } else if (event.type === 'result') {
@@ -161,6 +203,8 @@
                             } else if (event.type === 'error') {
                                 statusDiv.textContent = '❌ Erreur : ' + event.data.error;
                             }
+                        } catch (parseErr) {
+                            console.error('Error parsing final SSE event:', parseErr, dataStr);
                         }
                     }
                 }
