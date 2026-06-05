@@ -56,7 +56,7 @@ module.exports.generateContent = async function generateContent(prompt, options 
   }
 
   // Determine which model to use
-  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const url = `${GEMINI_API_ENDPOINT}/${model}:generateContent`;
 
   // Set request timeout
