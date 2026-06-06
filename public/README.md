@@ -1,24 +1,39 @@
-# JobFinder AI
+# Lille Events - System Architecture
 
-JobFinder is an automated tool designed to streamline the job search process by matching user profiles with live job openings using advanced AI.
+## Project Overview
 
-## How It Works
+Lille Events is an AI-powered event discovery and recommendation service that:
+1. Reads structured events and high-dimensional semantic vector embeddings from a PostgreSQL database using Prisma ORM.
+2. Uses Google Gemini AI to analyze natural language user prompts and extract structured search constraints (e.g., date ranges, neighborhoods, pricing).
+3. Executes semantic similarity queries using `pgvector` alongside metadata filters to find the best matched events.
+4. Generates highly personalized, tailored recommendations explaining why the matching events align with user preferences.
+5. Employs Server-Sent Events (SSE) to stream real-time progression and recommendation outputs to the web client.
 
-The application follows a two-step intelligent workflow:
+---
 
-### 1. Job Data Extraction (Stage 1)
-The application identifies job openings via curated company checkboxes (Kiabi, Exotec, Lesaffre) or custom company slugs.
-- It utilizes **Jina AI** (Reader API) and specialized platform lookups (SmartRecruiters, Greenhouse, Lever, etc.) to fetch the latest job postings.
-- It crawls these pages to extract a clean summary of open positions, removing the "noise" of standard web navigation and focus purely on the job content.
+## System Components
 
-### 2. Intelligent Comparison (Stage 2)
-Once the job data is collected, it is passed to **Google Gemini AI** (Gemini 2.5 Flash).
-- **Context Injection**: The extracted job summaries are appended to the user's specific request or profile.
-- **Matching Logic**: Gemini performs a semantic comparison between the user's skills, experience, and preferences and the actual requirements of the open roles.
-- **Output**: The user receives a curated list of recommendations explaining *why* certain positions are a good fit.
+### 1. API Endpoint Handler (`api/gemini.js`)
+- **Filter Extraction**: Sends the user's natural language input to `gemini-2.5-flash` to return a strictly structured JSON object containing start/end dates, neighborhoods, pricing constraints, age limits, and event types.
+- **Database Query Orchestrator**: Uses Prisma to query the database.
+- **AI Recommendation generation**: Forwards matched event metadata to the Gemini API (`generateContent`) along with the user prompt.
+- **SSE Streamer**: Sets headers to `text/event-stream` and streams chunked JSON progress events (`progress`, `result`, `error`) to the client.
 
-## Technical Stack
-- **Backend**: Node.js (Vercel Serverless Functions)
-- **AI Models**: Google Gemini 2.5 Flash
-- **Extraction**: Jina AI & Custom Platform Probes
-- **Communication**: Server-Sent Events (SSE) for real-time progress tracking
+### 2. Gemini Client (`services/geminiClient.js`)
+- Standardized fetch client wrapper for Google Gemini's `generateContent` API endpoint.
+- Features custom HTTP timeout management and comprehensive raw JSON/text response parser structures.
+
+### 3. Embeddings Script (`scripts/generate-embeddings.js`)
+- **Data Context Builder**: Aggregates event titles, chapôs (subtitles), descriptions, event types, and neighborhood names into a unified descriptive text paragraph.
+- **Sequential Embedder**: Uses Gemini's `gemini-embedding-2` model to produce 768-dimensional vector representations.
+- **PGVector Updater**: Safe BigInt-to-string conversion and updates database records using Raw SQL.
+- **Rate-limit Aware**: Employs exponential backoffs on `429` status codes and pauses for 2 seconds between batch offsets (50 events/batch).
+
+### 4. Database Schema (`prisma/schema.prisma`)
+- Modelled on Lille's municipal events dataset.
+- Integrates metadata attributes (such as dates, prices, addresses, neighborhoods, and categories) alongside a custom PostgreSQL `pgvector` column defined as `embedding Unsupported("vector")?`.
+
+---
+
+## Information Flow
+

@@ -15,7 +15,6 @@
 
 const { fetchWithTimeout } = require('../lib/http');
 const logger = require('../lib/logger');
-
 const contextLog = logger.createLogger('services/geminiClient');
 
 // ============================================================================
@@ -33,17 +32,17 @@ const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/mo
  *
  * @param {string} prompt - Text prompt to send to the model
  * @param {object} options - Request options
- *   - timeout: Request timeout in milliseconds (default: 20000)
+ * - timeout: Request timeout in milliseconds (default: 20000)
  *
  * @returns {Promise<object>} {
- *   text: string - Generated content text
- *   raw: object|string - Raw API response data
+ * text: string - Generated content text
+ * raw: object|string - Raw API response data
  * }
  *
  * @throws {Error} If API key is not configured or API returns error
- *   Error objects include:
- *   - .status: HTTP status code
- *   - .raw: Raw API response for debugging
+ * Error objects include:
+ * - .status: HTTP status code
+ * - .raw: Raw API response for debugging
  */
 module.exports.generateContent = async function generateContent(prompt, options = {}) {
   // Validate API key is configured
@@ -80,7 +79,11 @@ module.exports.generateContent = async function generateContent(prompt, options 
         {
           parts: [{ text: prompt }]
         }
-      ]
+      ],
+      // Forcer le retour en JSON (Structured Output)
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
     }),
     timeout
   });

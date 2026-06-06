@@ -10,12 +10,12 @@
  *
  * Request Format (POST):
  * {
- *   prompt: string (required) - User preferences for event recommendations
+ * prompt: string (required) - User preferences for event recommendations
  * }
  *
  * Response Format (SSE): 
  * event: progress -> { type: 'progress', data: { state, source?, eventCount? } }
- * event: result -> { type: 'result', data: { result: string, raw: any } }
+ * event: result -> { type: 'result', data: { result: object, raw: any } } // result est maintenant un objet JSON
  * event: error -> { type: 'error', data: { error: string } }
  */
 
@@ -105,7 +105,7 @@ module.exports = async (req, res) => {
 
   sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse de votre demande...' } });
 
-    const prisma = await getPrismaClient();
+  const prisma = await getPrismaClient();
 
   // 1. EXTRACT FILTERS USING GEMINI
   let filters = {};
@@ -171,7 +171,7 @@ Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`
     contextLog.info('Local development mode - insecure TLS enabled');
   }
 
-    // =========================================================================
+  // =========================================================================
   // Fetch events from Database (Prisma)
   // =========================================================================
   try {
@@ -219,14 +219,38 @@ Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`
         2
       );
 
-      finalPrompt += `\n\nVoici les événements correspondants trouvés dans la base de données. Formule une réponse personnalisée pour l'utilisateur en recommandant ces événements:\n${safeDbEventsStr}`;
+      finalPrompt += `\n\nVoici les événements correspondants trouvés dans la base de données:\n${safeDbEventsStr}`;
     } else {
-        finalPrompt += `\n\nAucun événement exact n'a été trouvé pour ces critères. Indique-le à l'utilisateur et donne-lui des conseils généraux liés à sa demande.`;
+        finalPrompt += `\n\nAucun événement exact n'a été trouvé pour ces critères.`;
     }
   } catch (err) {
     contextLog.error('Failed to fetch events from database', err);
     finalPrompt += `\n\n⚠️ Warning: Could not fetch database events: ${err.message}\n`;
   }
+
+  // =========================================================================
+  // Instructions système strictes pour forcer le JSON selon le schéma désiré
+  // =========================================================================
+  finalPrompt += `
+  
+Tu es un assistant qui recommande des événements à Lille.
+Tu dois STRICTEMENT renvoyer un objet JSON valide, sans balises Markdown, sans aucun texte avant ou après, en respectant rigoureusement le schéma suivant :
+{
+  "message_intro": "Petite phrase sympa pour introduire les choix.",
+  "recommendations": [
+    {
+      "identifiant": "ID de l'événement (issu de la BDD, transformer le BigInt en string)",
+      "titre": "Titre de l'événement",
+      "chapo": "Chapô ou courte description",
+      "image_url": "L'URL de l'image (ou null)",
+      "lieu": "Nom du lieu et Quartier",
+      "date_horaire": "Date ou horaires résumés",
+      "tarif": "Tarif ou gratuité",
+      "url_reservation": "Lien d'accès ou permalien",
+      "pourquoi_cest_top": "Explication de 2 phrases max justifiant ce choix par rapport à la demande utilisateur."
+    }
+  ]
+}`;
 
   // =========================================================================
   // Generate AI content using Gemini API
@@ -239,7 +263,7 @@ Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`
     // Supprime espaces et guillemets éventuels (ex: "true" -> true)
     const cleaned = val.trim().toLowerCase().replace(/['"]/g, '');
     return cleaned === 'true' || cleaned === '1' || cleaned === 'yes';
-};
+  };
 
   const isDebugMode = isTruthy(process.env.RETURN_DEBUG_PROMPT) || isTruthy(process.env.DEBUG);
 
@@ -269,7 +293,18 @@ Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`
       contextLog.info('Gemini API response received successfully', {
         responseLength: text ? text.length : 0
       });
-      sendEvent(res, { type: 'result', data: { result: text, raw } });
+      
+      // Parsing de la réponse JSON reçue
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(text);
+      } catch (parseError) {
+        contextLog.error('Erreur lors du parsing JSON de la réponse Gemini', { text, error: parseError.message });
+        throw new Error('La réponse de l\'IA n\'a pas pu être formatée en JSON valide.');
+      }
+
+      // Envoi de l'objet parsé au client
+      sendEvent(res, { type: 'result', data: { result: parsedResult, raw } });
     }
   } catch (err) {
     contextLog.error('Content generation failed', err);
@@ -283,4 +318,3 @@ Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`
   contextLog.debug('Closing SSE stream');
   res.end();
 };
-
