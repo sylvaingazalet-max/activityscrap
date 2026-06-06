@@ -17,6 +17,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.19.3",
+    "chrono-node": "^2.9.1",
     "dotenv": "^17.4.2"
   }
 }

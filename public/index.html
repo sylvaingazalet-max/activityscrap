@@ -3,67 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site en maintenance</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            color: #222;
-            background-color: #fafafa;
-            text-align: center;
-            padding: 20px;
-        }
-        .container {
-            background: #fff;
-            padding: 40px 30px;
-            border-radius: 8px;
-            border: 1px solid #eaeaea;
-            max-width: 500px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #111;
-            margin-bottom: 16px;
-            margin-top: 0;
-        }
-        p {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚧 De retour très vite !</h1>
-        <p>Le générateur d'activités est temporairement indisponible pour une petite mise à jour technique.<br><br>Merci de votre patience !</p>
-    </div>
-</body>
-</html>
-
-
-<!-- =========================================================================
-     VOTRE CODE ORIGINAL SAUVEGARDÉ CI-DESSOUS
-     =========================================================================
-     Pour remettre le site en ligne plus tard :
-     1. Supprimez tout le code au-dessus de cette ligne.
-     2. Supprimez la ligne contenant "<!--" juste en dessous.
-     3. Supprimez la ligne contenant "-->" tout à la fin du fichier.
-     ========================================================================= -->
-
-<!--
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suggestions d'activités</title>
     <style>
         body {
@@ -178,8 +117,14 @@
             
             if (data.recommendations && data.recommendations.length > 0) {
                 data.recommendations.forEach(rec => {
+                    // Préparation de la balise image si l'URL est fournie
+                    const imageHtml = rec.image_url 
+                        ? `<img src="${rec.image_url}" alt="${rec.titre}" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px;">` 
+                        : '';
+
                     html += `
                         <div style="background: #fff; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                            ${imageHtml}
                             <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #111;">${rec.titre}</h3>
                             <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
                                 <span>📍 ${rec.lieu}</span><br>
@@ -263,4 +208,3 @@
     </script>
 </body>
 </html>
--->

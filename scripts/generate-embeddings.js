@@ -1,10 +1,9 @@
 /**
- * Generate Embeddings for Events using Google Gemini API (gemini-embedding-2)
+ * Generate Embeddings for Events using Google Gemini API
  * and update the database via Prisma and PostgreSQL vector extensions.
  *
- * This script processes events in batches of 50 to avoid memory overloading
- * and to respect API rate limits. It implements sequential processing within 
- * batches, exponential backoff retries, and sleep delays between batches.
+ * This script processes events in batches to avoid memory overloading
+ * and to respect API rate limits.
  */
 
 const path = require('path');
@@ -20,7 +19,7 @@ const { getPrismaClient, disconnect } = require('../lib/prismaClient');
 // Configuration
 // ============================================================================
 const BATCH_SIZE = 50;
-const EMBEDDING_MODEL = 'gemini-embedding-2'; // Explicitly set as required
+const EMBEDDING_MODEL = 'gemini-embedding-2'; // Modèle Gemini recommandé pour les embeddings
 
 // Check for API key
 const apiKey = process.env.GEMINI_API_KEY;
@@ -40,17 +39,28 @@ function sleep(ms) {
 }
 
 /**
- * Format the text context from event fields to generate a high-quality embedding
- * Fields used: Title, Subtitle/Teaser (Chapô - FR), Long Description (Description longue - FR), Event Type, and Neighborhood (Quartier)
+ * Format the text context from event and location fields to generate a high-quality embedding
  */
 function buildTextContext(event) {
   const parts = [];
 
-  if (event.Titre___FR) parts.push(`Titre: ${event.Titre___FR.trim()}`);
-  if (event.Chap____FR) parts.push(`Résumé: ${event.Chap____FR.trim()}`);
-  if (event.Description_longue___FR) parts.push(`Description: ${event.Description_longue___FR.trim()}`);
-  if (event.Type_d__v_nement) parts.push(`Type d'événement: ${event.Type_d__v_nement.trim()}`);
-  if (event.Lieu__Quartier) parts.push(`Quartier: ${event.Lieu__Quartier.trim()}`);
+  if (event.titleFr) parts.push(`Titre: ${event.titleFr.trim()}`);
+  
+  // Utilisation de la description courte en priorité, sinon la longue
+  const description = event.descriptionFr || event.longDescriptionFr;
+  if (description) parts.push(`Description: ${description.trim()}`);
+  
+  if (event.category) parts.push(`Catégorie: ${event.category.trim()}`);
+
+  // Construction des infos du lieu
+  const locationParts = [];
+  if (event.locationName) locationParts.push(event.locationName.trim());
+  if (event.locationDistrict) locationParts.push(`Quartier ${event.locationDistrict.trim()}`);
+  if (event.locationCity) locationParts.push(event.locationCity.trim());
+  
+  if (locationParts.length > 0) {
+    parts.push(`Lieu: ${locationParts.join(', ')}`);
+  }
 
   return parts.join('\n\n');
 }
@@ -117,18 +127,21 @@ async function main() {
     for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
       console.log(`🔄 Batch ${batchIdx + 1}/${totalBatches} - Fetching ${BATCH_SIZE} events...`);
 
-      // Fetch the next batch of events where embedding IS NULL
+      // Jointure SQL pour récupérer les infos de l'événement ET de son lieu
       const eventsBatch = await prisma.$queryRaw`
         SELECT 
-          "Identifiant",
-          "Titre - FR" as "Titre___FR",
-          "Chapô - FR" as "Chap____FR",
-          "Description longue - FR" as "Description_longue___FR",
-          "Type d'événement" as "Type_d__v_nement",
-          "Lieu: Quartier" as "Lieu__Quartier"
-        FROM events
-        WHERE embedding IS NULL
-        ORDER BY "Identifiant" ASC
+          e.uid as "id",
+          e.title_fr as "titleFr",
+          e.description_fr as "descriptionFr",
+          e.longdescription_fr as "longDescriptionFr",
+          e.category as "category",
+          l.location_name as "locationName",
+          l.location_district as "locationDistrict",
+          l.location_city as "locationCity"
+        FROM events e
+        LEFT JOIN locations l ON e.location_uid = l.location_uid
+        WHERE e.embedding IS NULL
+        ORDER BY e.uid ASC
         LIMIT ${BATCH_SIZE}
       `;
 
@@ -137,48 +150,46 @@ async function main() {
         break;
       }
 
-      console.log(`🤖 Generating embeddings for ${eventsBatch.length} events sequentially to avoid 429 limit...`);
+      console.log(`🤖 Generating embeddings sequentially to avoid limits...`);
 
       let processedInBatch = 0;
       let failedInBatch = 0;
 
       for (const event of eventsBatch) {
-        const eventIdString = event.Identifiant.toString(); // BigInt safe string conversion
+        const eventId = event.id; // Déjà en string !
         const textToEmbed = buildTextContext(event);
 
         if (!textToEmbed.trim()) {
-          console.log(`⚠️ Event ${eventIdString} has no textual content to generate embedding. Skipping.`);
+          console.log(`⚠️ Event ${eventId} has no textual content. Skipping.`);
           continue;
         }
 
         try {
-          // Generate embedding with the correct dimension of 768
           const embedding = await embedWithRetry(model, textToEmbed);
 
           if (!embedding || embedding.length === 0) {
             throw new Error('Empty embedding received from Google Gemini API');
           }
 
-          // Convert to vector string format: '[0.1, -0.2, 0.3...]'
           const embeddingString = `[${embedding.join(',')}]`;
 
-          // Update database using raw SQL with stringified ID casted to bigint for absolute safety
+          // UPDATE sécurisé avec l'ID en String
           await prisma.$executeRawUnsafe(
-            'UPDATE events SET embedding = $1::vector WHERE "Identifiant" = $2::bigint',
+            'UPDATE events SET embedding = $1::vector WHERE uid = $2',
             embeddingString,
-            eventIdString
+            eventId
           );
 
           processedInBatch++;
         } catch (err) {
           failedInBatch++;
-          console.error(`❌ Failed to process event ${eventIdString}:`, err.message);
+          console.error(`❌ Failed to process event ${eventId}:`, err.message);
         }
       }
 
       console.log(`✅ Batch ${batchIdx + 1}/${totalBatches} completed. Success: ${processedInBatch}, Failures: ${failedInBatch}`);
 
-      // Wait 2000ms (2 seconds) between each batch as strictly requested
+      // Wait 2000ms between batches
       if (batchIdx < totalBatches - 1) {
         console.log(`💤 Sleeping for 2000ms to stay under Gemini RPM limits...`);
         await sleep(2000);

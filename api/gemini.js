@@ -1,29 +1,19 @@
 /**
- * Gemini API Route Handler
+ * Gemini API Route Handler - Version Hybride (pgvector & Chrono-node)
  *
  * Serverless function that:
- * 1. Validates incoming request payload
- * 2. Fetches events from configured sources using JinaAI for content extraction
- * 3. Generates AI-powered personalized event recommendations based on user preferences
- *
- * Implements Server-Sent Events (SSE) for streaming responses.
- *
- * Request Format (POST):
- * {
- * prompt: string (required) - User preferences for event recommendations
- * }
- *
- * Response Format (SSE): 
- * event: progress -> { type: 'progress', data: { state, source?, eventCount? } }
- * event: result -> { type: 'result', data: { result: object, raw: any } } // result est maintenant un objet JSON
- * event: error -> { type: 'error', data: { error: string } }
+ * 1. Parses date locally from user input using chrono-node (in milliseconds).
+ * 2. Cleans the prompt by removing the time-related string.
+ * 3. Generates a Gemini vector embedding from the cleaned prompt.
+ * 4. Executes a hybrid SQL query: strict date overlap filtering on the `timings` JSONB array
+ * AND pgvector cosine similarity sorting (<=>).
+ * 5. Streams personalized event recommendations using Gemini.
  */
 
-// Load environment variables from .env file
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Force le chargement du .env depuis la racine du projet pour éviter les problèmes de CWD
+// Force loading .env from project root
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 const { validatePayload } = require('../lib/validators');
@@ -31,6 +21,7 @@ const { generateContent } = require('../services/geminiClient');
 const { getPrismaClient } = require('../lib/prismaClient');
 const logger = require('../lib/logger');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const chrono = require('chrono-node');
 
 // Check for API key
 const apiKey = process.env.GEMINI_API_KEY;
@@ -39,21 +30,14 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 // ============================================================================
 // Constants
 // ============================================================================
-
-// Configuration for AI API
 const AI_API_CONFIG = {
-  timeout: 200000            // AI API timeout in milliseconds
+  timeout: 200000,
+  embeddingModel: 'gemini-embedding-2' // Modèle recommandé pour les embeddings
 };
 
 // ============================================================================
 // SSE Response Helpers
 // ============================================================================
-
-/**
- * Send SSE (Server-Sent Events) formatted event
- * @param {http.ServerResponse} res - Response object
- * @param {object} payload - Data to send (will be JSON stringified)
- */
 function sendEvent(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
@@ -61,18 +45,11 @@ function sendEvent(res, payload) {
 // ============================================================================
 // Main Handler
 // ============================================================================
-
-/**
- * Main Handler
- * Handles POST requests to generate AI content with event context
- */
 module.exports = async (req, res) => {
   const contextLog = logger.createLogger('api/gemini');
   contextLog.info('API route called', { method: req.method, url: req.url });
 
-  // =========================================================================
   // Validate HTTP method
-  // =========================================================================
   if (req.method !== 'POST') {
     contextLog.warn('Invalid HTTP method', { method: req.method });
     res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -80,9 +57,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // =========================================================================
   // Validate request payload
-  // =========================================================================
   contextLog.debug('Validating request payload', { body: req.body });
   const validationError = validatePayload(req.body);
   if (validationError) {
@@ -92,9 +67,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // =========================================================================
   // Setup Server-Sent Events stream
-  // =========================================================================
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -103,220 +76,243 @@ module.exports = async (req, res) => {
 
   const { prompt } = req.body || {};
 
-  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse de votre demande...' } });
+  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse locale de votre demande...' } });
 
   const prisma = await getPrismaClient();
 
-  // =========================================================================
-  // --- CORRECTION ICI : Verrouillage de la date sur le fuseau de Paris ---
-  // =========================================================================
-  const targetDate = new Date();
-  const todayStr = targetDate.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); // Donne toujours "YYYY-MM-DD"
-  const currentYear = new Date(targetDate.toLocaleString('en-US', { timeZone: 'Europe/Paris' })).getFullYear();
+  // Contexte temporel calé sur Paris
+  const targetDateRef = new Date();
+  const todayStr = targetDateRef.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); 
+  const currentYear = new Date(targetDateRef.toLocaleString('en-US', { timeZone: 'Europe/Paris' })).getFullYear();
 
-  // 1. EXTRACT FILTERS USING GEMINI
-  let filters = {};
-  
+  // ============================================================================
+  // 1. PARSING TEMPOREL LOCAL & NETTOYAGE (Phase Instantanée)
+  // ============================================================================
+  let startOfDay = null;
+  let endOfDay = null;
+  let cleanedPrompt = prompt;
+
   try {
-    contextLog.info('Extracting filters from prompt', { prompt });
-    const extractionPrompt = `Tu es un assistant de recherche spécialisé dans l'extraction de critères structurés à partir de requêtes d'utilisateurs cherchant des événements à Lille.
-Aujourd'hui nous sommes le ${todayStr}. L'année actuelle est ${currentYear}.
+    contextLog.info('Parsing temporal logic locally using chrono-node');
+    // Version française de chrono-node
+    const parsedDates = chrono.fr.parse(prompt, targetDateRef);
 
-Voici la requête de l'utilisateur :
-"${prompt}"
+    if (parsedDates.length > 0) {
+      const timeMatch = parsedDates[0];
+      contextLog.info('Time entity detected locally', { text: timeMatch.text, start: timeMatch.start.date() });
+      
+      const detectedDate = timeMatch.start.date();
+      
+      // On crée des bornes strictes pour le jour complet détecté (00:00:00.000 -> 23:59:59.999)
+      startOfDay = new Date(detectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      endOfDay = new Date(detectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
 
-Analyse cette requête et renvoie UNIQUE-MENT un objet JSON respectant scrupuleusement la structure suivante (sans aucun bloc Markdown \`\`\`json ou texte explicatif supplémentaire) :
-{
-  "startDate": "YYYY-MM-DD" (ou null),
-  "endDate": "YYYY-MM-DD" (ou null),
-  "neighborhoods": ["NomQuartier1", "NomQuartier2"] (liste de quartiers de Lille s'ils sont explicités, sinon un tableau vide. Exemples de quartiers valides : "Vieux-Lille", "Lille-Centre", "Wazemmes", "Fives", "Lille-Sud", "Vauban-Esquermes", "Saint-Maurice Pellevoisin", "Bois-Blancs", "Faubourg de Béthune", "Moulins"),
-  "isFree": true/false (ou null si non précisé),
-  "ageMin": integer (ou null si non précisé),
-  "eventType": "Type" (ou null. Exemples de types d'événements fréquents: "Concert", "Spectacle", "Fête / festival", "Stages et ateliers", "Visite", "Nature / environnement", "Rencontre / conférence / débat")
-}
+      // Si chrono-node a aussi détecté une date de fin (ex: "ce week-end", "du mardi au jeudi")
+      if (timeMatch.end) {
+        const detectedEndDate = timeMatch.end.date();
+        endOfDay = new Date(detectedEndDate);
+        endOfDay.setHours(23, 59, 59, 999);
+      }
 
-Note : Si la requête parle de "ce week-end", calcule la date de samedi et dimanche par rapport à aujourd'hui (${todayStr}). Si elle parle de "ce soir", calcule la date d'aujourd'hui. Si la requête contient une date ou période, convertis-la proprement au format YYYY-MM-DD.
-Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`;
-
-    const modelForExtraction = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const extractionResult = await modelForExtraction.generateContent(extractionPrompt);
-    const extractionText = extractionResult.response.text().trim();
-
-    // Clean potential markdown wrappers if Gemini returned them
-    const cleanedText = extractionText.replace(/```json/g, '').replace(/```/g, '').trim();
-    filters = JSON.parse(cleanedText);
-    contextLog.info('Successfully extracted filters', { filters });
+      // Nettoyage de la requête utilisateur (on retire la chaîne de caractères temporelle)
+      cleanedPrompt = prompt.replace(timeMatch.text, '').replace(/\s+/g, ' ').trim();
+      contextLog.info('Prompt cleaned successfully', { cleanedPrompt });
+    } else {
+      contextLog.info('No explicit date found in prompt. System will search without strict temporal range filtering.');
+    }
   } catch (err) {
-    contextLog.error('Failed to extract filters from Gemini, falling back to empty filters', err);
-    filters = {
-      startDate: null,
-      endDate: null,
-      neighborhoods: [],
-      isFree: null,
-      ageMin: null,
-      eventType: null
-    };
+    contextLog.error('Local temporal parsing failed, keeping original prompt', err);
   }
 
-  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche et filtrage en base de données...', filters } });
+  // ============================================================================
+  // 2. GÉNÉRATION DE L'EMBEDDING AU RUNTIME (pgvector requirement)
+  // ============================================================================
+  let vectorString = null;
+  
+  // Si le nettoyage a tout vidé (ex: l'user a juste écrit "Samedi"), on utilise le prompt d'origine
+  const searchForEmbedding = cleanedPrompt.length > 1 ? cleanedPrompt : prompt;
+
+  try {
+    contextLog.info('Generating embedding for the search query', { textToEmbed: searchForEmbedding });
+    const embeddingModel = genAI.getGenerativeModel({ model: AI_API_CONFIG.embeddingModel });
+    
+    const embeddingResult = await embeddingModel.embedContent({
+      content: { parts: [{ text: searchForEmbedding }] },
+      outputDimensionality: 768
+    });
+
+    if (embeddingResult?.embedding?.values) {
+      vectorString = `[${embeddingResult.embedding.values.join(',')}]`;
+    }
+  } catch (err) {
+    contextLog.error('Failed to generate embedding at runtime', err);
+  }
+
+  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche hybride (Date SQL + pgvector) en cours...' } });
 
   let finalPrompt = prompt;
 
-  contextLog.info('Request validated, starting database lookup', {
-    promptLength: prompt.length
-  });
-
-  // =========================================================================
-  // Optional: Allow insecure TLS for local development
-  // =========================================================================
   const isLocalDev = process.env.NODE_ENV !== 'production';
   const allowInsecureTls = process.env.ALLOW_INSECURE_TLS === 'true' && isLocalDev;
-
   if (allowInsecureTls) {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    contextLog.info('Local development mode - insecure TLS enabled');
   }
 
-  // =========================================================================
-  // Fetch events from Database (Prisma)
-  // =========================================================================
+  // ============================================================================
+  // 3. EXÉCUTION HYBRIDE (SQL Brute + pgvector)
+  // ============================================================================
   try {
-    contextLog.info('Fetching events based on extracted filters');
+    contextLog.info('Executing hybrid raw SQL query');
+    let dbEvents = [];
 
-    // BUILD PRISMA WHERE CLAUSE
-    const whereClause = {};
-
-    if (filters.startDate) {
-      whereClause.Horaires_ISO = { contains: filters.startDate };
+    if (vectorString) {
+      // Cas optimal : Recherche sémantique vectorielle disponible
+      if (startOfDay && endOfDay) {
+        contextLog.info('Hybrid Query with Strict Date overlap + pgvector sorting');
+        // Requête hybride complète avec filtrage sur le tableau JSONB timings
+        dbEvents = await prisma.$queryRaw`
+          SELECT 
+            e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
+            e.longdescription_fr as "longDescriptionFr", e.conditions_fr as "conditionsFr", 
+            e.image, e.daterange_fr as "dateRangeFr", e.timings, e.canonicalurl as "canonicalUrl",
+            l.location_name as "locationName", l.location_district as "locationDistrict"
+          FROM events e
+          LEFT JOIN locations l ON e.location_uid = l.location_uid
+          WHERE 
+            e.embedding IS NOT NULL
+            AND e.timings IS NOT NULL 
+            AND EXISTS (
+              SELECT 1 
+              FROM jsonb_array_elements(e.timings::jsonb) AS t(timing)
+              WHERE (t.timing->>'begin')::timestamp <= ${endOfDay}
+                AND (t.timing->>'end')::timestamp >= ${startOfDay}
+            )
+          ORDER BY e.embedding <=> ${vectorString}::vector
+          LIMIT 15;
+        `;
+      } else {
+        contextLog.info('Query with pgvector sorting only (No date filter detected)');
+        // Si aucune date n'est détectée, on effectue uniquement la recherche sémantique globale
+        dbEvents = await prisma.$queryRaw`
+          SELECT 
+            e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
+            e.longdescription_fr as "longDescriptionFr", e.conditions_fr as "conditionsFr", 
+            e.image, e.daterange_fr as "dateRangeFr", e.timings, e.canonicalurl as "canonicalUrl",
+            l.location_name as "locationName", l.location_district as "locationDistrict"
+          FROM events e
+          LEFT JOIN locations l ON e.location_uid = l.location_uid
+          WHERE e.embedding IS NOT NULL
+          ORDER BY e.embedding <=> ${vectorString}::vector
+          LIMIT 15;
+        `;
+      }
+    } else {
+      contextLog.warn('Embedding missing, fallback to traditional Prisma match');
+      // Fallback au cas où l'API d'embedding échouerait complètement
+      const whereClause = {};
+      if (startOfDay) {
+        whereClause.firstDateBegin = { gte: startOfDay };
+      }
+      dbEvents = await prisma.event.findMany({
+        where: whereClause,
+        include: { location: true },
+        take: 15
+      });
     }
-
-    if (filters.neighborhoods && filters.neighborhoods.length > 0) {
-      whereClause.Lieu__Quartier = { in: filters.neighborhoods };
-    }
-
-    if (filters.isFree === true) {
-      whereClause.OR = [
-        { Conditions_de_participation__tarifs___FR: { contains: 'gratuit', mode: 'insensitive' } },
-        { Conditions_de_participation__tarifs___FR: { contains: 'libre', mode: 'insensitive' } },
-        { D_tail_des_tarifs: { contains: 'gratuit', mode: 'insensitive' } }
-      ];
-    } else if (filters.isFree === false) {
-       whereClause.NOT = [
-        { Conditions_de_participation__tarifs___FR: { contains: 'gratuit', mode: 'insensitive' } },
-        { Conditions_de_participation__tarifs___FR: { contains: 'libre', mode: 'insensitive' } }
-      ];
-    }
-
-    if (filters.eventType) {
-      whereClause.Type_d__v_nement = { contains: filters.eventType, mode: 'insensitive' };
-    }
-
-    const dbEvents = await prisma.events.findMany({
-      where: whereClause,
-      take: 15
-    });
 
     contextLog.info(`Successfully fetched ${dbEvents.length} events from database`);
 
     if (dbEvents.length > 0) {
-      // Safe stringification that handles BigInt values
-      const safeDbEventsStr = JSON.stringify(dbEvents, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value,
-        2
-      );
+      // Remodelage léger pour correspondre au format attendu par le prompt final de Gemini
+      const formattedEvents = dbEvents.map(e => ({
+        id: e.id,
+        titleFr: e.titleFr,
+        descriptionFr: e.descriptionFr,
+        longDescriptionFr: e.longDescriptionFr,
+        conditionsFr: e.conditionsFr,
+        image: e.image,
+        dateRangeFr: e.dateRangeFr,
+        canonicalUrl: e.canonicalUrl,
+        location: {
+          name: e.locationName,
+          district: e.locationDistrict
+        }
+      }));
 
-      finalPrompt += `\n\nVoici les événements correspondants trouvés dans la base de données:\n${safeDbEventsStr}`;
+      finalPrompt += `\n\nVoici les événements correspondants trouvés (triés par pertinence sémantique) :\n${JSON.stringify(formattedEvents, null, 2)}`;
     } else {
-        finalPrompt += `\n\nAucun événement exact n'a été trouvé pour ces critères.`;
+      finalPrompt += `\n\nAucun événement n'a été trouvé dans la base de données pour la date ou les critères demandés.`;
     }
   } catch (err) {
-    contextLog.error('Failed to fetch events from database', err);
+    contextLog.error('Failed to execute hybrid search query', err);
     finalPrompt += `\n\n⚠️ Warning: Could not fetch database events: ${err.message}\n`;
   }
 
-  // =========================================================================
-  // --- CORRECTION ICI : Injection du contexte temporel ---
-  // =========================================================================
-  const dateContext = `\n\n[CONTEXTE TEMPOREL] Aujourd'hui nous sommes le ${todayStr}. L'année actuelle est ${currentYear}. Utilise cette date pour comprendre les expressions temporelles de l'utilisateur (ex: "ce soir", "ce week-end") et les lier aux événements fournis.\n\n`;
+  // Injection du contexte temporel pour la réécriture finale du LLM
+  const dateContext = `\n\n[CONTEXTE TEMPOREL] Aujourd'hui nous sommes le ${todayStr}. L'année actuelle est ${currentYear}. Utilise cette date pour formuler ta réponse s'il y a des incohérences.\n\n`;
   finalPrompt = dateContext + finalPrompt;
 
-
-  // =========================================================================
-  // Instructions système strictes pour forcer le JSON selon le schéma désiré
-  // =========================================================================
+  // Instructions système strictes
   finalPrompt += `
-  
 Tu es un assistant qui recommande des événements à Lille.
-Tu dois STRICTEMENT renvoyer un objet JSON valide, sans balises Markdown, sans aucun texte avant ou après, en respectant rigoureusement le schéma suivant :
+Tu dois STRICTEMENT renvoyer un objet JSON valide respectant rigoureusement le schéma suivant :
 {
   "message_intro": "Petite phrase sympa pour introduire les choix.",
   "recommendations": [
     {
-      "identifiant": "ID de l'événement (issu de la BDD, transformer le BigInt en string)",
-      "titre": "Titre de l'événement",
-      "chapo": "Chapô ou courte description",
-      "image_url": "L'URL de l'image (ou null)",
-      "lieu": "Nom du lieu et Quartier",
-      "date_horaire": "Date ou horaires résumés",
-      "tarif": "Tarif ou gratuité",
-      "url_reservation": "Lien d'accès ou permalien",
-      "pourquoi_cest_top": "Explication de 2 phrases max justifiant ce choix par rapport à la demande utilisateur."
+      "identifiant": "ID de l'événement (propriété 'id')",
+      "titre": "Titre de l'événement (propriété 'titleFr')",
+      "chapo": "Courte description (propriété 'descriptionFr' ou résumé de 'longDescriptionFr')",
+      "image_url": "L'URL de l'image (propriété 'image', ou null)",
+      "lieu": "Nom du lieu et Quartier (issus de l'objet 'location')",
+      "date_horaire": "Date ou horaires résumés (via 'dateRangeFr')",
+      "tarif": "Tarif ou gratuité (propriété 'conditionsFr')",
+      "url_reservation": "Lien d'accès ou permalien (propriété 'canonicalUrl')",
+      "pourquoi_cest_top": "Explication de 2 phrases max justifiant ce choix par rapport à la demande initiale de l'utilisateur."
     }
   ]
 }`;
 
-  // =========================================================================
-  // Generate AI content using Gemini API
-  // =========================================================================
-
-  // Helper robuste pour vérifier la véracité d'une variable d'env
+  // Helper de debug
   const isTruthy = (val) => {
     if (val === true || val === 1) return true;
     if (typeof val !== 'string') return false;
-    // Supprime espaces et guillemets éventuels (ex: "true" -> true)
     const cleaned = val.trim().toLowerCase().replace(/['"]/g, '');
     return cleaned === 'true' || cleaned === '1' || cleaned === 'yes';
   };
 
   const isDebugMode = isTruthy(process.env.RETURN_DEBUG_PROMPT) || isTruthy(process.env.DEBUG);
 
+  // ============================================================================
+  // 4. GENERATE RECOMMENDATIONS (Appel Gemini de rendu de texte)
+  // ============================================================================
   try {
-    contextLog.info('Starting AI content generation', {
-      debugMode: isDebugMode,
-      finalPromptLength: finalPrompt.length,
-      envCheck: {
-        // On force en String pour que JSON.stringify n'ignore pas les valeurs undefined
-        RETURN_DEBUG_PROMPT: String(process.env.RETURN_DEBUG_PROMPT),
-        DEBUG: String(process.env.DEBUG),
-        loadedKeys: Object.keys(process.env).filter(k => k.includes('DEBUG') || k.includes('GEMINI')).length
-      }
-    });
+    contextLog.info('Starting AI content generation');
 
     if (isDebugMode) {
-      // Debug mode: return the constructed prompt for inspection
       contextLog.debug('Returning debug prompt instead of calling API');
       const debugPrompt = `--- DEBUG MODE: Constructed Prompt ---\n${finalPrompt}`;
       sendEvent(res, { type: 'result', data: { result: debugPrompt } });
     } else {
-      // Production mode: call Gemini API
       contextLog.info('Calling Gemini API for content generation');
-      const { text, raw } = await generateContent(finalPrompt, {
+      
+      const { text, parsed, raw } = await generateContent(finalPrompt, {
         timeout: AI_API_CONFIG.timeout
       });
-      contextLog.info('Gemini API response received successfully', {
-        responseLength: text ? text.length : 0
-      });
       
-      // Parsing de la réponse JSON reçue
-      let parsedResult;
-      try {
-        parsedResult = JSON.parse(text);
-      } catch (parseError) {
-        contextLog.error('Erreur lors du parsing JSON de la réponse Gemini', { text, error: parseError.message });
-        throw new Error('La réponse de l\'IA n\'a pas pu être formatée en JSON valide.');
+      let parsedResult = parsed;
+      if (!parsedResult) {
+        try {
+          parsedResult = JSON.parse(text);
+        } catch (parseError) {
+          contextLog.error('Erreur lors du parsing JSON de la réponse Gemini', { text, error: parseError.message });
+          throw new Error('La réponse de l\'IA n\'a pas pu être formatée en JSON valide.');
+        }
       }
 
-      // Envoi de l'objet parsé au client
       sendEvent(res, { type: 'result', data: { result: parsedResult, raw } });
     }
   } catch (err) {
