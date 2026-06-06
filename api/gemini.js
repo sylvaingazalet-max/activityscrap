@@ -107,10 +107,16 @@ module.exports = async (req, res) => {
 
   const prisma = await getPrismaClient();
 
+  // =========================================================================
+  // --- CORRECTION ICI : Verrouillage de la date sur le fuseau de Paris ---
+  // =========================================================================
+  const targetDate = new Date();
+  const todayStr = targetDate.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); // Donne toujours "YYYY-MM-DD"
+  const currentYear = new Date(targetDate.toLocaleString('en-US', { timeZone: 'Europe/Paris' })).getFullYear();
+
   // 1. EXTRACT FILTERS USING GEMINI
   let filters = {};
-  const todayStr = new Date().toISOString().split('T')[0]; // e.g. "2026-06-04"
-  const currentYear = new Date().getFullYear();
+  
   try {
     contextLog.info('Extracting filters from prompt', { prompt });
     const extractionPrompt = `Tu es un assistant de recherche spécialisé dans l'extraction de critères structurés à partir de requêtes d'utilisateurs cherchant des événements à Lille.
@@ -227,6 +233,13 @@ Renvoie STRICTEMENT le JSON de la forme spécifiée ci-dessus, sans fioritures.`
     contextLog.error('Failed to fetch events from database', err);
     finalPrompt += `\n\n⚠️ Warning: Could not fetch database events: ${err.message}\n`;
   }
+
+  // =========================================================================
+  // --- CORRECTION ICI : Injection du contexte temporel ---
+  // =========================================================================
+  const dateContext = `\n\n[CONTEXTE TEMPOREL] Aujourd'hui nous sommes le ${todayStr}. L'année actuelle est ${currentYear}. Utilise cette date pour comprendre les expressions temporelles de l'utilisateur (ex: "ce soir", "ce week-end") et les lier aux événements fournis.\n\n`;
+  finalPrompt = dateContext + finalPrompt;
+
 
   // =========================================================================
   // Instructions système strictes pour forcer le JSON selon le schéma désiré
