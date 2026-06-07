@@ -271,6 +271,7 @@ module.exports = async (req, res) => {
   // Instructions système strictes
   finalPrompt += `
 Tu es un assistant qui recommande des événements à Lille.
+TU ne peux mettre des evenemeents QUE si ils sont dans ceux qu'on t'a fourni dans ce prompt. Sinon précise qu'aucun evenement n'est disponible.
 Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons (plusieurs événements identiques avec des id différents), respectant rigoureusement le schéma suivant :
 {
   "message_intro": "Petite phrase sympa pour introduire les choix.",
