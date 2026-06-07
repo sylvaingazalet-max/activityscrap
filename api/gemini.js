@@ -154,6 +154,7 @@ module.exports = async (req, res) => {
   sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche hybride (Date SQL + pgvector) en cours...' } });
 
   let finalPrompt = prompt;
+  let fallbackRecommendations = []; // Stockage des événements bruts
 
   const isLocalDev = process.env.NODE_ENV !== 'production';
   const allowInsecureTls = process.env.ALLOW_INSECURE_TLS === 'true' && isLocalDev;
@@ -242,6 +243,18 @@ module.exports = async (req, res) => {
         }
       }));
 
+      // Préparation des données formatées pour le front-end en cas de panne Gemini
+      fallbackRecommendations = formattedEvents.map(e => ({
+        identifiant: e.id,
+        titre: e.titleFr,
+        chapo: e.descriptionFr || "Plus de détails sur la page de l'événement.",
+        image_url: e.image,
+        lieu: e.location.name ? `${e.location.name} ${e.location.district ? `(${e.location.district})` : ''}` : 'Lille',
+        date_horaire: e.dateRangeFr,
+        tarif: e.conditionsFr || 'Non précisé',
+        url_reservation: e.canonicalUrl
+      }));
+
       finalPrompt += `\n\nVoici les événements correspondants trouvés (triés par pertinence sémantique) :\n${JSON.stringify(formattedEvents, null, 2)}`;
     } else {
       finalPrompt += `\n\nAucun événement n'a été trouvé dans la base de données pour la date ou les critères demandés.`;
@@ -258,7 +271,7 @@ module.exports = async (req, res) => {
   // Instructions système strictes
   finalPrompt += `
 Tu es un assistant qui recommande des événements à Lille.
-Tu dois STRICTEMENT renvoyer un objet JSON valide respectant rigoureusement le schéma suivant :
+Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons (plusieurs événements identiques avec des id différents), respectant rigoureusement le schéma suivant :
 {
   "message_intro": "Petite phrase sympa pour introduire les choix.",
   "recommendations": [
@@ -313,24 +326,19 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide respectant rigoureusement le s
           attempts++;
           
           if (attempts >= maxAttempts) {
-            // Deuxième plantage : Extraction du message d'erreur natif renvoyé par Gemini
-            let geminiErrorMessage = err.message || "Erreur inconnue de l'API Gemini";
+            // Fallback gracieux au lieu de faire planter la requête
+            contextLog.warn(`Gemini API completely failed after ${maxAttempts} attempts. Falling back to raw DB results.`, { error: err.message });
             
-            if (err.raw) {
-              if (typeof err.raw === 'object' && err.raw.error?.message) {
-                geminiErrorMessage = err.raw.error.message;
-              } else if (typeof err.raw === 'string') {
-                try {
-                  const parsedRaw = JSON.parse(err.raw);
-                  if (parsedRaw.error?.message) {
-                    geminiErrorMessage = parsedRaw.error.message;
-                  }
-                } catch (_) {
-                  geminiErrorMessage = err.raw;
-                }
-              }
-            }
-            throw new Error(geminiErrorMessage);
+            const fallbackResponse = {
+              message_intro: "Oups, notre IA est actuellement très sollicitée et n'a pas pu personnaliser votre réponse 🤖. Voici tout de même la sélection brute des événements trouvés :",
+              recommendations: fallbackRecommendations.length > 0 ? fallbackRecommendations : []
+            };
+
+            // On simule la réponse de Gemini
+            text = JSON.stringify(fallbackResponse);
+            raw = { fallback_activated: true, original_error: err.message };
+            
+            break; // On sort de la boucle avec notre texte de secours, qui sera parsé en JSON juste après
           }
 
           // Premier plantage : on attend 2 secondes avant de boucler

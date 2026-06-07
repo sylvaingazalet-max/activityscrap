@@ -8,7 +8,7 @@ generator client {
 }
 
 model Event {
-  id                         String    @id @map("uid") // UID OpenAgenda (String recommandé pour éviter les limites de sérialisation des BigInt en JSON)
+  id                         String    @id @map("uid") // UID OpenAgenda
   slug                       String?
   canonicalUrl               String?   @map("canonicalurl")
   titleFr                    String?   @map("title_fr")
@@ -23,7 +23,7 @@ model Event {
   thumbnail                  String?
   originalImage              String?   @map("originalimage")
   
-  // Temporalité (Typé proprement pour les requêtes de recherche de dates)
+  // Temporalité
   updatedAt                  DateTime? @map("updatedat")
   dateRangeFr                String?   @map("daterange_fr")
   firstDateBegin             DateTime? @map("firstdate_begin")
@@ -34,12 +34,12 @@ model Event {
   
   // Accessibilité
   accessibility              String?
-  accessibilityLabelFr       String[]  @map("accessibility_label_fr") // Tableau de chaînes natif PostgreSQL (ex: ["handicap moteur"])
+  accessibilityLabelFr       String[]  @map("accessibility_label_fr") // Tableau de chaînes natif PostgreSQL
   
   // Statuts & Paramètres OpenAgenda
-  attendanceMode             Json?     @map("attendancemode") // Stocke l'objet d'état de présence {"id": 1, "label": {...}}
+  attendanceMode             Json?     @map("attendancemode") // Stocke l'objet d'état de présence
   onlineAccessLink           String?   @map("onlineaccesslink")
-  status                     Json?     // Stocke l'objet de statut {"id": 1, "label": {...}}
+  status                     Json?     // Stocke l'objet de statut
   ageMin                     Int?      @map("age_min")
   ageMax                     Int?      @map("age_max")
   
@@ -50,7 +50,7 @@ model Event {
   countryFr                  String?   @map("country_fr")
   
   // Inscriptions & Liens externes
-  registration               Json?     // Stocke le tableau d'objets d'inscription [{"type": "email", "value": "..."}]
+  registration               Json?     // Stocke le tableau d'objets d'inscription
   links                      Json?     // Stocke le tableau de liens additionnels
   
   // Informations sur le contributeur de la fiche
@@ -72,33 +72,90 @@ model Event {
   @@map("events")
 }
 
+model IgnoredEvent {
+  id                         String    @id @map("uid")
+  slug                       String?
+  canonicalUrl               String?   @map("canonicalurl")
+  titleFr                    String?   @map("title_fr")
+  descriptionFr              String?   @map("description_fr")
+  longDescriptionFr          String?   @map("longdescription_fr")
+  conditionsFr               String?   @map("conditions_fr")
+  keywordsFr                 Json?     @map("keywords_fr")
+  
+  image                      String?
+  imageCredits               String?   @map("imagecredits")
+  thumbnail                  String?
+  originalImage              String?   @map("originalimage")
+  
+  updatedAt                  DateTime? @map("updatedat")
+  dateRangeFr                String?   @map("daterange_fr")
+  firstDateBegin             DateTime? @map("firstdate_begin")
+  firstDateEnd               DateTime? @map("firstdate_end")
+  lastDateBegin              DateTime? @map("lastdate_begin")
+  lastDateEnd                DateTime? @map("lastdate_end")
+  timings                    Json?     
+  
+  accessibility              String?
+  accessibilityLabelFr       String[]  @map("accessibility_label_fr")
+  
+  attendanceMode             Json?     @map("attendancemode")
+  onlineAccessLink           String?   @map("onlineaccesslink")
+  status                     Json?     
+  ageMin                     Int?      @map("age_min")
+  ageMax                     Int?      @map("age_max")
+  
+  originAgendaTitle          String?   @map("originagenda_title")
+  originAgendaUid            String?   @map("originagenda_uid")
+  category                   String?
+  countryFr                  String?   @map("country_fr")
+  
+  registration               Json?     
+  links                      Json?     
+  
+  contributorEmail           String?   @map("contributor_email")
+  contributorContactNumber   String?   @map("contributor_contactnumber")
+  contributorContactName     String?   @map("contributor_contactname")
+  contributorContactPosition String?   @map("contributor_contactposition")
+  contributorOrganization    String?   @map("contributor_organization")
+
+  // --- RELATIONS ---
+  locationId                 String?   @map("location_uid")
+  location                   Location? @relation(fields: [locationId], references: [id])
+
+  // --- MÉTADONNÉES D'ARCHIVAGE ---
+  ignoredAt                  DateTime  @default(now()) @map("ignored_at")
+
+  @@map("ignored_events")
+}
+
 model Location {
-  id            String  @id @map("location_uid")
-  coordinates   Json?   @map("location_coordinates") // Stocke l'objet géospatial {"lon": 3.04, "lat": 50.63}
-  name          String? @map("location_name")
-  address       String? @map("location_address")
-  district      String? @map("location_district")
-  insee         String? @map("location_insee")
-  postalCode    String? @map("location_postalcode")
-  city          String? @map("location_city")
-  department    String? @map("location_department")
-  region        String? @map("location_region")
-  countryCode   String? @map("location_countrycode")
+  id            String         @id @map("location_uid")
+  coordinates   Json?          @map("location_coordinates") // Stocke l'objet géospatial {"lon": 3.04, "lat": 50.63}
+  name          String?        @map("location_name")
+  address       String?        @map("location_address")
+  district      String?        @map("location_district")
+  insee         String?        @map("location_insee")
+  postalCode    String?        @map("location_postalcode")
+  city          String?        @map("location_city")
+  department    String?        @map("location_department")
+  region        String?        @map("location_region")
+  countryCode   String?        @map("location_countrycode")
   
   // Médias liés au lieu
-  image         String? @map("location_image")
-  imageCredits  String? @map("location_imagecredits")
+  image         String?        @map("location_image")
+  imageCredits  String?        @map("location_imagecredits")
   
   // Contacts & Infos d'accès du lieu
-  phone         String? @map("location_phone")
-  website       String? @map("location_website")
-  links         String? @map("location_links")
-  tags          Json?   @map("location_tags")
-  descriptionFr String? @map("location_description_fr")
-  accessFr      String? @map("location_access_fr")
+  phone         String?        @map("location_phone")
+  website       String?        @map("location_website")
+  links         String?        @map("location_links")
+  tags          Json?          @map("location_tags")
+  descriptionFr String?        @map("location_description_fr")
+  accessFr      String?        @map("location_access_fr")
 
-  // Relation inverse : un lieu peut héberger plusieurs événements
+  // Relations inverses
   events        Event[]
+  ignoredEvents IgnoredEvent[] // Nouvelle relation pour les événements ignorés
 
   @@map("locations")
-}
+}npx prisma migrate dev --name add_ignored_events_table
