@@ -267,11 +267,10 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide respectant rigoureusement le s
       "titre": "Titre de l'événement (propriété 'titleFr')",
       "chapo": "Courte description (propriété 'descriptionFr' ou résumé de 'longDescriptionFr')",
       "image_url": "L'URL de l'image (propriété 'image', ou null)",
-      "lieu": "Nom du lieu et Quartier (issus de l'objet 'location')",
+      "lieu": "Ville / Nom du lieu (issus de l'objet 'location')",
       "date_horaire": "Date ou horaires résumés (via 'dateRangeFr')",
       "tarif": "Tarif ou gratuité (propriété 'conditionsFr')",
       "url_reservation": "Lien d'accès ou permalien (propriété 'canonicalUrl')",
-      "pourquoi_cest_top": "Explication de 2 phrases max justifiant ce choix par rapport à la demande initiale de l'utilisateur."
     }
   ]
 }`;
@@ -287,7 +286,7 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide respectant rigoureusement le s
   const isDebugMode = isTruthy(process.env.RETURN_DEBUG_PROMPT) || isTruthy(process.env.DEBUG);
 
   // ============================================================================
-  // 4. GENERATE RECOMMENDATIONS (Appel Gemini de rendu de texte)
+  // 4. GENERATE RECOMMENDATIONS (Appel Gemini de rendu de texte avec Retry)
   // ============================================================================
   try {
     contextLog.info('Starting AI content generation');
@@ -297,20 +296,55 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide respectant rigoureusement le s
       const debugPrompt = `--- DEBUG MODE: Constructed Prompt ---\n${finalPrompt}`;
       sendEvent(res, { type: 'result', data: { result: debugPrompt } });
     } else {
-      contextLog.info('Calling Gemini API for content generation');
-      
-      const { text, parsed, raw } = await generateContent(finalPrompt, {
-        timeout: AI_API_CONFIG.timeout
-      });
-      
-      let parsedResult = parsed;
-      if (!parsedResult) {
+      let text, raw;
+      let attempts = 0;
+      const maxAttempts = 2; // Première tentative + 1 retry
+
+      while (attempts < maxAttempts) {
         try {
-          parsedResult = JSON.parse(text);
-        } catch (parseError) {
-          contextLog.error('Erreur lors du parsing JSON de la réponse Gemini', { text, error: parseError.message });
-          throw new Error('La réponse de l\'IA n\'a pas pu être formatée en JSON valide.');
+          contextLog.info(`Calling Gemini API for content generation (Attempt ${attempts + 1}/${maxAttempts})`);
+          const response = await generateContent(finalPrompt, {
+            timeout: AI_API_CONFIG.timeout
+          });
+          text = response.text;
+          raw = response.raw;
+          break; // Succès ! On sort de la boucle de retry
+        } catch (err) {
+          attempts++;
+          
+          if (attempts >= maxAttempts) {
+            // Deuxième plantage : Extraction du message d'erreur natif renvoyé par Gemini
+            let geminiErrorMessage = err.message || "Erreur inconnue de l'API Gemini";
+            
+            if (err.raw) {
+              if (typeof err.raw === 'object' && err.raw.error?.message) {
+                geminiErrorMessage = err.raw.error.message;
+              } else if (typeof err.raw === 'string') {
+                try {
+                  const parsedRaw = JSON.parse(err.raw);
+                  if (parsedRaw.error?.message) {
+                    geminiErrorMessage = parsedRaw.error.message;
+                  }
+                } catch (_) {
+                  geminiErrorMessage = err.raw;
+                }
+              }
+            }
+            throw new Error(geminiErrorMessage);
+          }
+
+          // Premier plantage : on attend 2 secondes avant de boucler
+          contextLog.warn(`Gemini API call failed. Retrying in 2 seconds...`, { error: err.message });
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
+      }
+      
+      let parsedResult = null;
+      try {
+        parsedResult = JSON.parse(text);
+      } catch (parseError) {
+        contextLog.error('Erreur lors du parsing JSON de la réponse Gemini', { text, error: parseError.message });
+        throw new Error('La réponse de l\'IA n\'a pas pu être formatée en JSON valide.');
       }
 
       sendEvent(res, { type: 'result', data: { result: parsedResult, raw } });

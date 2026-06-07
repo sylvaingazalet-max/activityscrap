@@ -132,9 +132,6 @@
                                 <span>💶 ${rec.tarif}</span>
                             </div>
                             <p style="margin: 0 0 15px 0; font-size: 15px;">${rec.chapo}</p>
-                            <div style="background: #f9f9f9; padding: 12px; border-radius: 6px; border-left: 3px solid #111;">
-                                <span style="font-size: 14px;">💡 <strong>Pourquoi c'est top :</strong> ${rec.pourquoi_cest_top}</span>
-                            </div>
                             ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" style="display: inline-block; margin-top: 15px; font-size: 14px; color: #111; font-weight: 500;">En savoir plus / Réserver →</a>` : ''}
                         </div>
                     `;
@@ -152,7 +149,7 @@
             searchBtn.disabled = true;
             resultsDiv.style.display = 'none';
             resultsDiv.innerHTML = '';
-            statusDiv.innerHTML = '<div class="loading-spinner"></div> Connexion en cours...';
+            statusDiv.innerHTML = '<div class="loading-spinner"></div> Recherche en cours...';
 
             try {
                 const response = await fetch('/api/gemini', {
