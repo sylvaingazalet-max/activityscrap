@@ -158,4 +158,4 @@ model Location {
   ignoredEvents IgnoredEvent[] // Nouvelle relation pour les événements ignorés
 
   @@map("locations")
-}npx prisma migrate dev --name add_ignored_events_table
+}

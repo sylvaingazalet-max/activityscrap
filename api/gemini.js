@@ -2,12 +2,11 @@
  * Gemini API Route Handler - Version Hybride (pgvector & Chrono-node)
  *
  * Serverless function that:
- * 1. Parses date locally from user input using chrono-node (in milliseconds).
- * 2. Cleans the prompt by removing the time-related string.
- * 3. Generates a Gemini vector embedding from the cleaned prompt.
- * 4. Executes a hybrid SQL query: strict date overlap filtering on the `timings` JSONB array
+ * 1. Parses date via LLM (with local chrono-node fallback) from user input.
+ * 2. Generates a Gemini vector embedding from the cleaned prompt.
+ * 3. Executes a hybrid SQL query: strict date overlap filtering on the `timings` JSONB array
  * AND pgvector cosine similarity sorting (<=>).
- * 5. Streams personalized event recommendations using Gemini.
+ * 4. Streams personalized event recommendations using Gemini.
  */
 
 const path = require('path');
@@ -21,7 +20,7 @@ const { generateContent } = require('../services/geminiClient');
 const { getPrismaClient } = require('../lib/prismaClient');
 const logger = require('../lib/logger');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const chrono = require('chrono-node');
+const { parseTemporalPrompt } = require('../lib/temporalParser');
 
 // Check for API key
 const apiKey = process.env.GEMINI_API_KEY;
@@ -32,7 +31,7 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 // ============================================================================
 const AI_API_CONFIG = {
   timeout: 200000,
-  embeddingModel: 'gemini-embedding-2' // Modèle recommandé pour les embeddings
+  embeddingModel: 'gemini-embedding-2'
 };
 
 // ============================================================================
@@ -76,7 +75,7 @@ module.exports = async (req, res) => {
 
   const { prompt } = req.body || {};
 
-  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse locale de votre demande...' } });
+  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse temporelle de votre demande...' } });
 
   const prisma = await getPrismaClient();
 
@@ -86,45 +85,31 @@ module.exports = async (req, res) => {
   const currentYear = new Date(targetDateRef.toLocaleString('en-US', { timeZone: 'Europe/Paris' })).getFullYear();
 
   // ============================================================================
-  // 1. PARSING TEMPOREL LOCAL & NETTOYAGE (Phase Instantanée)
+  // 1. PARSING TEMPOREL PAR IA & FALLBACK LOCAL
   // ============================================================================
   let startOfDay = null;
   let endOfDay = null;
   let cleanedPrompt = prompt;
+  let searchForEmbedding = prompt;
 
   try {
-    contextLog.info('Parsing temporal logic locally using chrono-node');
-    // Version française de chrono-node
-    const parsedDates = chrono.fr.parse(prompt, targetDateRef);
+    contextLog.info('Parsing temporal logic using LLM with local fallback');
+    
+    // Ajout du await et passage de genAI pour activer la détection par Gemini
+    const parsedData = await parseTemporalPrompt(prompt, targetDateRef, genAI);
+    
+    startOfDay = parsedData.startOfDay;
+    endOfDay = parsedData.endOfDay;
+    cleanedPrompt = parsedData.cleanedPrompt;
+    searchForEmbedding = parsedData.searchForEmbedding;
 
-    if (parsedDates.length > 0) {
-      const timeMatch = parsedDates[0];
-      contextLog.info('Time entity detected locally', { text: timeMatch.text, start: timeMatch.start.date() });
-      
-      const detectedDate = timeMatch.start.date();
-      
-      // On crée des bornes strictes pour le jour complet détecté (00:00:00.000 -> 23:59:59.999)
-      startOfDay = new Date(detectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      
-      endOfDay = new Date(detectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      // Si chrono-node a aussi détecté une date de fin (ex: "ce week-end", "du mardi au jeudi")
-      if (timeMatch.end) {
-        const detectedEndDate = timeMatch.end.date();
-        endOfDay = new Date(detectedEndDate);
-        endOfDay.setHours(23, 59, 59, 999);
-      }
-
-      // Nettoyage de la requête utilisateur (on retire la chaîne de caractères temporelle)
-      cleanedPrompt = prompt.replace(timeMatch.text, '').replace(/\s+/g, ' ').trim();
-      contextLog.info('Prompt cleaned successfully', { cleanedPrompt });
+    if (startOfDay) {
+      contextLog.info('Time entity detected', { start: startOfDay, end: endOfDay, cleanedPrompt });
     } else {
-      contextLog.info('No explicit date found in prompt. System will search without strict temporal range filtering.');
+      contextLog.info('No explicit date found. System will search without strict temporal range filtering.');
     }
   } catch (err) {
-    contextLog.error('Local temporal parsing failed, keeping original prompt', err);
+    contextLog.error('Temporal parsing block failed, keeping original prompt', err);
   }
 
   // ============================================================================
@@ -132,9 +117,6 @@ module.exports = async (req, res) => {
   // ============================================================================
   let vectorString = null;
   
-  // Si le nettoyage a tout vidé (ex: l'user a juste écrit "Samedi"), on utilise le prompt d'origine
-  const searchForEmbedding = cleanedPrompt.length > 1 ? cleanedPrompt : prompt;
-
   try {
     contextLog.info('Generating embedding for the search query', { textToEmbed: searchForEmbedding });
     const embeddingModel = genAI.getGenerativeModel({ model: AI_API_CONFIG.embeddingModel });
@@ -154,7 +136,7 @@ module.exports = async (req, res) => {
   sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche hybride (Date SQL + pgvector) en cours...' } });
 
   let finalPrompt = prompt;
-  let fallbackRecommendations = []; // Stockage des événements bruts
+  let fallbackRecommendations = [];
 
   const isLocalDev = process.env.NODE_ENV !== 'production';
   const allowInsecureTls = process.env.ALLOW_INSECURE_TLS === 'true' && isLocalDev;
@@ -170,10 +152,8 @@ module.exports = async (req, res) => {
     let dbEvents = [];
 
     if (vectorString) {
-      // Cas optimal : Recherche sémantique vectorielle disponible
       if (startOfDay && endOfDay) {
         contextLog.info('Hybrid Query with Strict Date overlap + pgvector sorting');
-        // Requête hybride complète avec filtrage sur le tableau JSONB timings
         dbEvents = await prisma.$queryRaw`
           SELECT 
             e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
@@ -196,7 +176,6 @@ module.exports = async (req, res) => {
         `;
       } else {
         contextLog.info('Query with pgvector sorting only (No date filter detected)');
-        // Si aucune date n'est détectée, on effectue uniquement la recherche sémantique globale
         dbEvents = await prisma.$queryRaw`
           SELECT 
             e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
@@ -212,7 +191,6 @@ module.exports = async (req, res) => {
       }
     } else {
       contextLog.warn('Embedding missing, fallback to traditional Prisma match');
-      // Fallback au cas où l'API d'embedding échouerait complètement
       const whereClause = {};
       if (startOfDay) {
         whereClause.firstDateBegin = { gte: startOfDay };
@@ -227,7 +205,6 @@ module.exports = async (req, res) => {
     contextLog.info(`Successfully fetched ${dbEvents.length} events from database`);
 
     if (dbEvents.length > 0) {
-      // Remodelage léger pour correspondre au format attendu par le prompt final de Gemini
       const formattedEvents = dbEvents.map(e => ({
         id: e.id,
         titleFr: e.titleFr,
@@ -243,7 +220,6 @@ module.exports = async (req, res) => {
         }
       }));
 
-      // Préparation des données formatées pour le front-end en cas de panne Gemini
       fallbackRecommendations = formattedEvents.map(e => ({
         identifiant: e.id,
         titre: e.titleFr,
@@ -264,11 +240,9 @@ module.exports = async (req, res) => {
     finalPrompt += `\n\n⚠️ Warning: Could not fetch database events: ${err.message}\n`;
   }
 
-  // Injection du contexte temporel pour la réécriture finale du LLM
   const dateContext = `\n\n[CONTEXTE TEMPOREL] Aujourd'hui nous sommes le ${todayStr}. L'année actuelle est ${currentYear}. Utilise cette date pour formuler ta réponse s'il y a des incohérences.\n\n`;
   finalPrompt = dateContext + finalPrompt;
 
-  // Instructions système strictes
   finalPrompt += `
 Tu es un assistant qui recommande des événements à Lille.
 TU ne peux mettre des evenemeents QUE si ils sont dans ceux qu'on t'a fourni dans ce prompt. Sinon précise qu'aucun evenement n'est disponible.
@@ -289,7 +263,6 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
   ]
 }`;
 
-  // Helper de debug
   const isTruthy = (val) => {
     if (val === true || val === 1) return true;
     if (typeof val !== 'string') return false;
@@ -312,7 +285,7 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
     } else {
       let text, raw;
       let attempts = 0;
-      const maxAttempts = 2; // Première tentative + 1 retry
+      const maxAttempts = 2;
 
       while (attempts < maxAttempts) {
         try {
@@ -322,12 +295,11 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
           });
           text = response.text;
           raw = response.raw;
-          break; // Succès ! On sort de la boucle de retry
+          break;
         } catch (err) {
           attempts++;
           
           if (attempts >= maxAttempts) {
-            // Fallback gracieux au lieu de faire planter la requête
             contextLog.warn(`Gemini API completely failed after ${maxAttempts} attempts. Falling back to raw DB results.`, { error: err.message });
             
             const fallbackResponse = {
@@ -335,14 +307,11 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
               recommendations: fallbackRecommendations.length > 0 ? fallbackRecommendations : []
             };
 
-            // On simule la réponse de Gemini
             text = JSON.stringify(fallbackResponse);
             raw = { fallback_activated: true, original_error: err.message };
-            
-            break; // On sort de la boucle avec notre texte de secours, qui sera parsé en JSON juste après
+            break;
           }
 
-          // Premier plantage : on attend 2 secondes avant de boucler
           contextLog.warn(`Gemini API call failed. Retrying in 2 seconds...`, { error: err.message });
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
@@ -366,7 +335,6 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
     });
   }
 
-  // Close the SSE stream
   contextLog.debug('Closing SSE stream');
   res.end();
 };
