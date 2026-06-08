@@ -29,7 +29,8 @@
             margin: 0;
             padding: 20px 15px;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            align-items: center;
         }
 
         .container {
@@ -42,7 +43,6 @@
             box-sizing: border-box;
         }
 
-        /* Correction du titre h1 pour que l'émoji garde ses couleurs */
         h1 {
             font-size: 28px;
             font-weight: 800;
@@ -55,7 +55,6 @@
             gap: 10px;
         }
 
-        /* Le dégradé ne s'applique désormais qu'au texte dans le span */
         h1 span {
             background: linear-gradient(135deg, #ea580c, #db2777);
             -webkit-background-clip: text;
@@ -212,6 +211,64 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Styles pour le footer et la modale légale */
+        .site-footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .site-footer button {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 5px;
+            font-family: inherit;
+            transition: color 0.2s ease;
+        }
+
+        .site-footer button:hover {
+            color: var(--text-main);
+            text-decoration: underline;
+        }
+
+        .legal-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 450px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .close-modal:hover { color: var(--text-main); }
+
         @media (max-width: 480px) {
             .container { padding: 25px 20px; }
             h1 { font-size: 24px; }
@@ -237,10 +294,46 @@
         <div id="results"></div>
     </div>
 
+    <!-- Footer discret -->
+    <footer class="site-footer">
+        <button id="openLegalBtn">Mentions légales</button>
+    </footer>
+
+    <!-- Modale Mentions Légales -->
+    <div id="legalModal" class="legal-modal">
+        <div class="modal-content">
+            <button id="closeLegalBtn" class="close-modal">✕</button>
+            <h2 style="margin-top: 0; font-size: 20px;">Mentions légales</h2>
+            
+            <h3 style="font-size: 16px; margin-bottom: 5px;">Éditeur du site</h3>
+            <p style="font-size: 14px; margin-top: 0; color: var(--text-muted);">
+                Ce site est édité à titre personnel. L'éditeur a fait le choix de garder l'anonymat. Conformément à la loi pour la confiance dans l'économie numérique (LCEN), ses coordonnées exactes ont été transmises à l'hébergeur.
+            </p>
+
+            <h3 style="font-size: 16px; margin-bottom: 5px;">Hébergement</h3>
+            <p style="font-size: 14px; margin-top: 0; color: var(--text-muted);">
+                Ce site est hébergé par Vercel Inc.<br>
+                440 N Barranca Ave #4133<br>
+                Covina, CA 91723, États-Unis<br>
+                Contact : privacy@vercel.com
+            </p>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
     <script>
+        // --- Gestion de la modale des mentions légales ---
+        const modal = document.getElementById('legalModal');
+        const openBtn = document.getElementById('openLegalBtn');
+        const closeBtn = document.getElementById('closeLegalBtn');
+
+        openBtn.onclick = () => modal.style.display = 'flex';
+        closeBtn.onclick = () => modal.style.display = 'none';
+        window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; }
+
+        // --- Logique principale de l'application ---
         const datePicker = flatpickr("#dateRange", {
             mode: "range",
             locale: "fr",

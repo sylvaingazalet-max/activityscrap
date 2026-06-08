@@ -29,46 +29,6 @@ const { getPrismaClient, disconnect } = require('../lib/prismaClient');
 const BATCH_SIZE = 100;
 const AGENDAS_FILE = 'agendas_lille.json';
 
-// Liste noire des agendas à ne PAS interroger
-const EXCLUDED_ORIGIN_AGENDAS = new Set([
-  "Bistrot de St So",
-  "APES Hauts-de-France",
-  "Musée d'Histoire Naturelle de Lille",
-  "Maison de l'Habitat Durable",
-  "TicketMaster",
-  "Tu m'étonnes Productions",
-  "Maison natale Charles de Gaulle",
-  "Danse enfants / Vieux-Lille / Maison de quartier 24 rue des Archives",
-  "Association du Musée Hospitalier Régional de Lille",
-  "WAAO - Centre d'architecture et d'urbanisme",
-  "Wazemmes",
-  "Lille-Centre",
-  "La culture en continu",
-  "Musée des écoles",
-  "Conservatoire à Rayonnement Régional de Lille",
-  "Archives départementales du Nord",
-  "Bois-Blancs",
-  "Lille-Sud",
-  "Parc de la Citadelle",
-  "Palais des Beaux-Arts",
-  "Gare Saint Sauveur",
-  "Théâtre Barrière de Lille",
-  "Faubourg de Béthune",
-  "Le Grand Sud",
-  "FLOW",
-  "Vauban-Esquermes",
-  "Fiesta - lille3000",
-  "Ville d’art et d’histoire de Lille",
-  "Ville de Lille",
-  "Bibliothèque municipale de Lille",
-  "Lille-Moulins",
-  "HARACOM",
-  "Musée de l'hospice Comtesse",
-  "Solid’Art Lille - Secours populaire du Nord",
-  "Maisons Folie Wazemmes et Moulins",
-  "Nature à Lille",
-  "St-Maurice Pellevoisin"
-]);
 
 function safeDate(value) {
   if (!value) return null;
@@ -86,9 +46,6 @@ function mapOaToPrisma(oaEvent) {
 
   // On garde cette sécurité au cas où un agenda autorisé aspirerait un événement d'un agenda exclu
   const originAgendaTitle = oaEvent.originAgenda?.title || oaEvent.agenda?.title || null;
-  if (originAgendaTitle && EXCLUDED_ORIGIN_AGENDAS.has(originAgendaTitle)) {
-    return { skip: true, reason: 'blacklist' }; 
-  }
 
   const loc = oaEvent.location || {};
   let locationId = loc.uid ? String(loc.uid) : null;
@@ -217,15 +174,7 @@ async function main() {
     for (let i = 0; i < agendasList.length; i++) {
       const agenda = agendasList[i];
       
-      // === LE FILTRE EST ICI ===
-      // Si le titre de l'agenda est dans la liste noire, on zappe tout de suite sans faire d'appel
-      if (EXCLUDED_ORIGIN_AGENDAS.has(agenda.title)) {
-        console.log(`\n======================================================`);
-        console.log(`⏭️ [${i + 1}/${agendasList.length}] Agenda ignoré (Liste noire) : "${agenda.title}"`);
-        console.log(`======================================================`);
-        agendasSkippedEntirely++;
-        continue;
-      }
+
 
       console.log(`\n======================================================`);
       console.log(`⏳ [${i + 1}/${agendasList.length}] Extraction : "${agenda.title}" (UID: ${agenda.uid})`);
