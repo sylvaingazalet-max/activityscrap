@@ -25,7 +25,7 @@ const { getPrismaClient, disconnect } = require('../lib/prismaClient');
 // ============================================================================
 const BASE_URL = 'https://app.ticketmaster.com/discovery/v2/events.json';
 const LILLE_LATLONG = '50.6292,3.0572'; // Centre de Lille
-const RADIUS = '15';
+const RADIUS = '30';
 const UNIT = 'km';
 
 // ============================================================================
