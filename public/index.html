@@ -4,155 +4,293 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>La boussole lilloise</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
+    
     <style>
+        :root {
+            --primary: #d97706; /* Un orange chaud/ambré */
+            --primary-hover: #b45309;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             line-height: 1.6;
-            max-width: 650px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            color: #222;
-            background-color: #fafafa;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px 15px;
+            display: flex;
+            justify-content: center;
         }
+
         .container {
-            background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            border: 1px solid #eaeaea;
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 600px;
+            padding: 35px 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
         }
+
         h1 {
-            font-size: 22px;
-            font-weight: 600;
-            color: #111;
-            margin-bottom: 24px;
+            font-size: 28px;
+            font-weight: 800;
             text-align: center;
+            margin-top: 0;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #ea580c, #db2777);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
-        .section { margin-bottom: 20px; }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
         label {
             display: block;
-            font-weight: 500;
-            margin-bottom: 10px;
-            color: #444;
-        }
-        textarea {
-            width: 100%;
-            height: 100px;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            resize: vertical;
-            box-sizing: border-box;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-main);
             font-size: 15px;
-            font-family: inherit;
         }
-        textarea:focus { outline: none; border-color: #000; }
-        button {
+
+        /* Champs de saisie */
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 16px; /* 16px évite le zoom auto sur iOS */
+            font-family: inherit;
+            background-color: #f9fafb;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+        }
+
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+
+        /* Bouton */
+        button.primary-btn {
             display: block;
             width: 100%;
-            padding: 14px;
-            background: #111;
+            padding: 16px;
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
             color: white;
             border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: 500;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 6px rgba(234, 88, 12, 0.2);
         }
-        button:hover { background: #333; }
+
+        button.primary-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(234, 88, 12, 0.3);
+        }
+
+        button.primary-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
         button:disabled {
-            background: #eaeaea;
-            color: #999;
+            background: #d1d5db;
+            box-shadow: none;
             cursor: not-allowed;
         }
+
+        /* Statut et Résultats */
         #status {
             margin-top: 20px;
-            font-size: 14px;
-            color: #666;
-            text-align: center;
-        }
-        #results {
-            margin-top: 25px;
-            padding: 20px;
-            background: #fafafa;
-            border: 1px solid #eaeaea;
-            border-radius: 6px;
-            display: none;
             font-size: 15px;
-            color: #333;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
         }
+
+        #results {
+            margin-top: 30px;
+            display: none;
+        }
+
+        /* Cartes d'événements */
+        .event-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .event-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.06);
+            border-color: #d1d5db;
+        }
+
+        .event-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .event-title {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        .event-meta {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            background: #f3f4f6;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .event-meta span { display: block; margin-bottom: 5px; }
+        .event-meta span:last-child { margin-bottom: 0; }
+
+        .event-desc {
+            margin: 0 0 15px 0;
+            font-size: 15px;
+            color: #4b5563;
+        }
+
+        .event-link {
+            display: inline-block;
+            font-size: 15px;
+            color: var(--primary);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .event-link:hover { text-decoration: underline; }
+
+        /* Spinner */
         .loading-spinner {
             display: inline-block;
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(0,0,0,.1);
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
             border-radius: 50%;
-            border-top-color: #000;
+            border-top-color: var(--primary);
             animation: spin 0.8s linear infinite;
-            margin-right: 8px;
+            margin-right: 10px;
             vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Mobile Adjustments */
+        @media (max-width: 480px) {
+            .container { padding: 25px 20px; }
+            h1 { font-size: 24px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Titre personnalisé -->
-        <h1>La boussole lilloise</h1>
+        <h1>🧭 La boussole lilloise</h1>
+        
         <div class="section">
-            <!-- Champ de saisie & Exemple personnalisés -->
-            <label for="prompt">De quoi avez-vous envie aujourd'hui ?</label>
-            <textarea id="prompt" placeholder="Ex : Exposition avec des enfants demain matin"></textarea>
+            <label for="dateRange">Quand voulez-vous sortir ?</label>
+            <input type="text" id="dateRange" placeholder="Sélectionnez une ou plusieurs dates...">
         </div>
-        <!-- Bouton d'action personnalisé -->
-        <button id="searchBtn">Trouver mon bonheur</button>
+
+        <div class="section">
+            <label for="prompt">De quoi avez-vous envie ?</label>
+            <textarea id="prompt" placeholder="Ex : Une expo sympa pour des enfants de 8 ans, un concert rock en soirée, une pièce de théâtre drôle..."></textarea>
+        </div>
+        
+        <button id="searchBtn" class="primary-btn">Trouver mon bonheur</button>
         <div id="status"></div>
         <div id="results"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
+
     <script>
+        // Initialisation du calendrier interactif
+        const datePicker = flatpickr("#dateRange", {
+            mode: "range",          // Permet de sélectionner de Date A à Date B
+            locale: "fr",           // En français
+            minDate: "today",       // On ne peut pas chercher dans le passé
+            dateFormat: "Y-m-d",    // Format caché pour l'API
+            altInput: true,         // Crée un faux champ visuellement plus beau
+            altFormat: "j F Y",     // Format d'affichage (ex: 12 Juin 2026)
+        });
+
         const searchBtn = document.getElementById('searchBtn');
         const resultsDiv = document.getElementById('results');
         const statusDiv = document.getElementById('status');
 
         function createCardHtml(rec) {
             const imageHtml = rec.image_url 
-                ? `<img src="${rec.image_url}" alt="${rec.titre}" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px;">` 
+                ? `<img src="${rec.image_url}" alt="${rec.titre}" class="event-image">` 
                 : '';
             return `
-                <div style="background: #fff; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <div class="event-card">
                     ${imageHtml}
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #111;">${rec.titre}</h3>
-                    <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
-                        <span>📍 ${rec.lieu}</span><br>
-                        <span>📅 ${rec.date_horaire}</span><br>
-                        <span>💶 ${rec.tarif}</span>
+                    <h3 class="event-title">${rec.titre}</h3>
+                    <div class="event-meta">
+                        <span>📍 <strong>Lieu :</strong> ${rec.lieu}</span>
+                        <span>📅 <strong>Quand :</strong> ${rec.date_horaire}</span>
+                        <span>💶 <strong>Tarif :</strong> ${rec.tarif}</span>
                     </div>
-                    <p style="margin: 0 0 15px 0; font-size: 15px;">${rec.chapo}</p>
-                    ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" style="display: inline-block; margin-top: 15px; font-size: 14px; color: #111; font-weight: 500;">En savoir plus / Réserver →</a>` : ''}
+                    <p class="event-desc">${rec.chapo}</p>
+                    ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" class="event-link">En savoir plus / Réserver →</a>` : ''}
                 </div>
             `;
         }
 
-        // Le texte de résultats reste inchangé (on touche pas !)
         function renderEvents(data, extraEvents = []) {
-            let html = `<p style="font-size: 16px; font-weight: 500; color: #111; margin-bottom: 20px;">👋 ${data.message_intro}</p>`;
+            let html = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
             
             if (data.recommendations && data.recommendations.length > 0) {
                 data.recommendations.forEach(rec => {
                     html += createCardHtml(rec);
                 });
             } else {
-                html += `<p>Aucun événement ne correspond à cette recherche.</p>`;
+                html += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
             }
 
             if (extraEvents && extraEvents.length > 0) {
-                html += `<div id="extraEventsContainer" style="display: none; margin-top: 20px;">`;
+                html += `<div id="extraEventsContainer" style="display: none; margin-top: 25px;">`;
                 extraEvents.forEach(rec => {
                     html += createCardHtml(rec);
                 });
                 html += `</div>`;
-                html += `<button id="toggleExtraBtn" style="margin-top: 15px; background: #eee; color: #333; padding: 10px 14px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; width: 100%; font-weight: 500;">Voir plus d'événements (${extraEvents.length})</button>`;
+                html += `<button id="toggleExtraBtn" style="margin-top: 10px; background: #e5e7eb; color: var(--text-main); padding: 12px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; width: 100%; font-weight: 600; transition: background 0.2s;">Voir plus d'événements (${extraEvents.length})</button>`;
             }
 
             resultsDiv.innerHTML = html;
@@ -174,21 +312,34 @@
 
         searchBtn.onclick = async () => {
             const prompt = document.getElementById('prompt').value.trim();
+            
+            // Extraction des dates depuis Flatpickr
+            const selectedDates = datePicker.selectedDates;
+            let startDate = "";
+            let endDate = "";
+            
+            if (selectedDates.length > 0) {
+                // Formate la date de début pour l'API (YYYY-MM-DD)
+                startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
+                // S'il y a une date de fin, on la prend, sinon c'est la même que la date de début
+                endDate = selectedDates[1] ? flatpickr.formatDate(selectedDates[1], "Y-m-d") : startDate;
+            }
+
             if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
 
             searchBtn.disabled = true;
             resultsDiv.style.display = 'none';
             resultsDiv.innerHTML = '';
-            statusDiv.innerHTML = '<div class="loading-spinner"></div> Recherche en cours...';
+            statusDiv.innerHTML = '<div class="loading-spinner"></div> Recherche des meilleures sorties en cours...';
 
             try {
                 const response = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
+                    body: JSON.stringify({ prompt, startDate, endDate })
                 });
 
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -211,26 +362,26 @@
                             try {
                                 const event = JSON.parse(dataStr);
                                 if (event.type === 'progress') {
-                                    statusDiv.innerHTML = `<div class="loading-spinner"></div> Recherche d'idées en cours...`;
+                                    statusDiv.innerHTML = `<div class="loading-spinner"></div> ${event.data.message}`;
                                 } else if (event.type === 'result') {
-                                    // État de succès mis à jour avec votre texte personnalisé
-                                    statusDiv.textContent = 'Tadam !';
+                                    statusDiv.textContent = '';
                                     resultsDiv.style.display = 'block';
                                     renderEvents(event.data.result, event.data.extra_events);
                                 } else if (event.type === 'error') {
                                     statusDiv.textContent = '❌ Erreur : ' + event.data.error;
                                 }
                             } catch (parseErr) {
-                                console.error('Error parsing SSE event:', parseErr);
+                                console.error('Erreur de parsing:', parseErr);
                             }
                         }
                     }
                 }
             } catch (err) {
-                statusDiv.textContent = "❌ Erreur de connexion.";
+                statusDiv.textContent = "❌ Oups, impossible de se connecter à la boussole.";
                 console.error(err);
             } finally {
                 searchBtn.disabled = false;
+                searchBtn.textContent = "Nouvelle recherche";
             }
         };
     </script>

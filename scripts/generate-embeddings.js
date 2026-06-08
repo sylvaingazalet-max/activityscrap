@@ -3,9 +3,9 @@
  *
  * PIPELINE HYBRIDE SÉCURISÉ :
  * 1. Gemini 2.5 Flash Lite : Analyse sémantique (enrichissement) + Extraction temporelle brute (Structured Output).
- * 2. Chrono-node & expandRecurrence : Dépliage mathématique des dates et récurrences.
+ * 2. Tri par priorités (6 Règles) : Utilisation des champs structurés (Begin/End) avant de basculer sur Chrono-node.
  * 3. Gemini Embedding 2 : Vectorise les mots-clés et l'ambiance enrichis.
- * 4. PostgreSQL : Sauvegarde le vecteur, et met à jour 'timings' UNIQUEMENT si nécessaire (ou si les dates actuelles sont trop larges).
+ * 4. PostgreSQL : Sauvegarde le vecteur, met à jour 'timings' et génère un 'daterange_fr' de secours si manquant.
  */
 
 const path = require('path');
@@ -138,6 +138,43 @@ function expandRecurrence(globalStartDate, globalEndDate, weekdays, startTime, e
   return timings;
 }
 
+/**
+ * Génère un daterange_fr formaté propre (ex: "du 14/05/2024 10h au 14/05/2024 12h")
+ * Limite à 3 éléments max pour ne pas polluer.
+ */
+function generateDateRangeFrString(timings) {
+  if (!timings || !Array.isArray(timings) || timings.length === 0) return null;
+
+  const formatPart = (isoString) => {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '??/??/???? ??h';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hour = String(d.getHours()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hour}h`;
+  };
+
+  const maxItems = Math.min(timings.length, 3);
+  const parts = [];
+
+  for (let i = 0; i < maxItems; i++) {
+    const t = timings[i];
+    if (t.begin && t.end) {
+      parts.push(`du ${formatPart(t.begin)} au ${formatPart(t.end)}`);
+    } else if (t.begin) {
+      parts.push(`le ${formatPart(t.begin)}`);
+    }
+  }
+
+  let result = parts.join(', ');
+  if (timings.length > 3) {
+    result += ' ...';
+  }
+
+  return result;
+}
+
 // ============================================================================
 // Main Execution Function
 // ============================================================================
@@ -204,7 +241,7 @@ async function main() {
         const eventId = event.id;
         
         // ============================================================================
-        // --- ETAPE 1 : PREPARATION VIA LLM (Sémantique + Récurrence) ---
+        // --- ETAPE 1 : PREPARATION VIA LLM (Sémantique) ---
         // ============================================================================
         const eventDataForAI = {
           titre: event.titleFr,
@@ -243,100 +280,122 @@ Analyse 'daterange_texte' et 'date_debut_reference' pour scinder la temporalité
           if (!parsedData.condensed_text) throw new Error("LLM returned empty condensed text");
 
           // ============================================================================
-          // --- ETAPE 2 : CALCUL DES DATES INTELLIGENT ---
+          // --- ETAPE 2 : CALCUL DES DATES SELON LES 6 RÈGLES DE PRIORITÉ ---
           // ============================================================================
-          let inferredTimings = null;
+          let calculatedTimings = null;
           let hasValidTimings = false;
 
           if (event.timings && Array.isArray(event.timings) && event.timings.length > 0) {
             hasValidTimings = true;
-            // On invalide les timings s'ils contiennent un bloc trop large (> 24h)
             for (const t of event.timings) {
               const durationHours = (new Date(t.end).getTime() - new Date(t.begin).getTime()) / (1000 * 60 * 60);
               if (durationHours > 24) { 
                 hasValidTimings = false;
-                console.log(`  [INFO] Event ${eventId} : Timings actuels trop larges (${Math.round(durationHours)}h). Recalcul forcé.`);
                 break;
               }
             }
           }
-          
-          const extractedText = parsedData.extracted_time_text;
-          const isValidExtractedText = extractedText && extractedText !== "null" && extractedText !== "[]" && extractedText.trim() !== "";
 
-          // On ne calcule de nouvelles dates QUE si la base n'en a pas déjà de valides
-          if (!hasValidTimings && (isValidExtractedText || event.dateRangeFr)) {
-            const rule = parsedData.recurrence_rule || {};
-            
-            // 1. CAS DATES ISOLÉES ("30 mai et 20 juin")
-            if (parsedData.specific_dates && parsedData.specific_dates.length > 0) {
-              inferredTimings = [];
-              const startH = rule.start_time ? parseInt(rule.start_time.split(':')[0], 10) : 0;
-              const startM = rule.start_time ? parseInt(rule.start_time.split(':')[1], 10) : 0;
-              const endH = rule.end_time ? parseInt(rule.end_time.split(':')[0], 10) : 23;
-              const endM = rule.end_time ? parseInt(rule.end_time.split(':')[1], 10) : 59;
+          if (hasValidTimings) {
+            console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides et courts conservés.`);
+            calculatedTimings = null;
+          } 
+          else if (event.firstDateBegin && event.lastDateEnd && 
+                   ((new Date(event.lastDateEnd).getTime() - new Date(event.firstDateBegin).getTime()) / (1000 * 60 * 60) <= 24)) {
+            console.log(`  [RÈGLE 2] Event ${eventId} : Utilisation du couple Begin/End court issu des colonnes.`);
+            calculatedTimings = [{
+              begin: new Date(event.firstDateBegin).toISOString(),
+              end: new Date(event.lastDateEnd).toISOString()
+            }];
+          } 
+          else if (event.firstDateBegin && !event.lastDateEnd) {
+            console.log(`  [RÈGLE 3] Event ${eventId} : Uniquement firstDateBegin présent. Création d'un créneau de +3h.`);
+            const startDate = new Date(event.firstDateBegin);
+            const endDate = new Date(startDate.getTime() + (3 * 60 * 60 * 1000));
+            calculatedTimings = [{
+              begin: startDate.toISOString(),
+              end: endDate.toISOString()
+            }];
+          } 
+          else {
+            const extractedText = parsedData.extracted_time_text;
+            const isValidExtractedText = extractedText && extractedText !== "null" && extractedText !== "[]" && extractedText.trim() !== "";
+
+            if (isValidExtractedText || event.dateRangeFr) {
+              const rule = parsedData.recurrence_rule || {};
               
-              for (const dStr of parsedData.specific_dates) {
-                const dateObj = new Date(dStr);
-                if (isNaN(dateObj.getTime())) continue; 
+              if (parsedData.specific_dates && parsedData.specific_dates.length > 0) {
+                calculatedTimings = [];
+                const startH = rule.start_time ? parseInt(rule.start_time.split(':')[0], 10) : 0;
+                const startM = rule.start_time ? parseInt(rule.start_time.split(':')[1], 10) : 0;
+                const endH = rule.end_time ? parseInt(rule.end_time.split(':')[0], 10) : 23;
+                const endM = rule.end_time ? parseInt(rule.end_time.split(':')[1], 10) : 59;
                 
-                const beginDate = new Date(dateObj);
-                beginDate.setHours(startH, startM, 0, 0);
-                
-                const endDate = new Date(dateObj);
-                endDate.setHours(endH, endM, 59, 999);
-                
-                inferredTimings.push({ begin: beginDate.toISOString(), end: endDate.toISOString() });
-              }
-            } 
-            // 2. CAS RÉCURRENCE OU LONGUE PÉRIODE
-            else if (parsedData.is_recurring && rule.weekdays) {
-              const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
-              let textToParseForBounds = extractedText || event.dateRangeFr;
-
-              // Retrait de forwardDate pour ne pas forcer le passage à l'année suivante
-              const parsedDates = chrono.fr.parse(textToParseForBounds, referenceDate);
-              
-              if (parsedDates && parsedDates.length > 0) {
-                const parsed = parsedDates[0];
-                const globalStart = parsed.start.date();
-                const globalEnd = parsed.end ? parsed.end.date() : new Date(globalStart.getTime() + (180 * 24 * 60 * 60 * 1000)); 
-
-                inferredTimings = expandRecurrence(globalStart, globalEnd, rule.weekdays, rule.start_time, rule.end_time);
-              }
-            } 
-            // 3. FALLBACK CHRONO STANDARD
-            else {
-              const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
-              let textToParseForBounds = extractedText || event.dateRangeFr;
-              const parsedDates = chrono.fr.parse(textToParseForBounds, referenceDate);
-
-              if (parsedDates && parsedDates.length > 0) {
-                inferredTimings = parsedDates.map(parsed => {
-                  const startDate = parsed.start.date();
-                  if (!parsed.start.isCertain('hour')) {
-                    if (rule.start_time) {
-                      startDate.setHours(parseInt(rule.start_time.split(':')[0]), parseInt(rule.start_time.split(':')[1]), 0, 0);
-                    } else {
-                      startDate.setHours(0, 0, 0, 0);
-                    }
-                  }
-
-                  const endDate = parsed.end ? parsed.end.date() : new Date(startDate);
-                  if (!parsed.end) {
-                    if (!parsed.start.isCertain('hour') && !rule.end_time) {
-                      endDate.setHours(23, 59, 59, 999);
-                    } else if (rule.end_time) {
-                      endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
-                    } else {
-                      endDate.setHours(startDate.getHours() + 3);
-                    }
-                  } else if (!parsed.end.isCertain('hour') && rule.end_time) {
-                    endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
-                  }
+                for (const dStr of parsedData.specific_dates) {
+                  const dateObj = new Date(dStr);
+                  if (isNaN(dateObj.getTime())) continue; 
                   
-                  return { begin: startDate.toISOString(), end: endDate.toISOString() };
-                });
+                  const beginDate = new Date(dateObj);
+                  beginDate.setHours(startH, startM, 0, 0);
+                  
+                  const endDate = new Date(dateObj);
+                  endDate.setHours(endH, endM, 59, 999);
+                  
+                  calculatedTimings.push({ begin: beginDate.toISOString(), end: endDate.toISOString() });
+                }
+              } 
+              else if (parsedData.is_recurring && rule.weekdays) {
+                const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
+                const parsedDates = chrono.fr.parse(extractedText || event.dateRangeFr, referenceDate);
+                
+                if (parsedDates && parsedDates.length > 0) {
+                  const parsed = parsedDates[0];
+                  const globalStart = parsed.start.date();
+                  const globalEnd = parsed.end ? parsed.end.date() : new Date(globalStart.getTime() + (180 * 24 * 60 * 60 * 1000)); 
+
+                  calculatedTimings = expandRecurrence(globalStart, globalEnd, rule.weekdays, rule.start_time, rule.end_time);
+                }
+              } 
+              else {
+                const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
+                const parsedDates = chrono.fr.parse(extractedText || event.dateRangeFr, referenceDate);
+
+                if (parsedDates && parsedDates.length > 0) {
+                  calculatedTimings = parsedDates.map(parsed => {
+                    const startDate = parsed.start.date();
+                    if (!parsed.start.isCertain('hour') && rule.start_time) {
+                      startDate.setHours(parseInt(rule.start_time.split(':')[0]), parseInt(rule.start_time.split(':')[1]), 0, 0);
+                    }
+
+                    const endDate = parsed.end ? parsed.end.date() : new Date(startDate);
+                    if (!parsed.end) {
+                      if (!parsed.start.isCertain('hour') && !rule.end_time) {
+                        endDate.setHours(23, 59, 59, 999);
+                      } else if (rule.end_time) {
+                        endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
+                      } else {
+                        endDate.setHours(startDate.getHours() + 3);
+                      }
+                    } else if (!parsed.end.isCertain('hour') && rule.end_time) {
+                      endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
+                    }
+                    
+                    return { begin: startDate.toISOString(), end: endDate.toISOString() };
+                  });
+                }
+              }
+            }
+
+            if (!calculatedTimings || calculatedTimings.length === 0) {
+              if (event.timings && event.timings.length > 0) {
+                console.log(`  [RÈGLE 5] Event ${eventId} : Échec texte. Conservation des timings larges d'origine.`);
+                calculatedTimings = null; 
+              } else if (event.firstDateBegin && event.lastDateEnd) {
+                console.log(`  [RÈGLE 5] Event ${eventId} : Échec texte. Conversion du couple Begin/End large historique.`);
+                calculatedTimings = [{
+                  begin: new Date(event.firstDateBegin).toISOString(),
+                  end: new Date(event.lastDateEnd).toISOString()
+                }];
               }
             }
           }
@@ -353,23 +412,46 @@ Analyse 'daterange_texte' et 'date_debut_reference' pour scinder la temporalité
           const embeddingString = `[${embedResult.embedding.values.join(',')}]`;
 
           // ============================================================================
-          // --- ETAPE 4 : MISE A JOUR BASE DE DONNEES ---
+          // --- ETAPE 4 : MISE A JOUR BASE DE DONNEES ET DATERANGE_FR ---
           // ============================================================================
-          if (inferredTimings && inferredTimings.length > 0) {
-            console.log(`  [INFO] Event ${eventId} : Timings recalculés (Nbr: ${inferredTimings.length}) et Vectorisés.`);
-            await prisma.$executeRawUnsafe(
-              'UPDATE events SET embedding = $1::vector, timings = $3::jsonb WHERE uid = $2',
-              embeddingString,
-              eventId,
-              JSON.stringify(inferredTimings)
-            );
+          
+          // Récupération des timings finaux pour générer le daterange s'il manque
+          const finalTimings = (calculatedTimings && calculatedTimings.length > 0) ? calculatedTimings : event.timings;
+          let generatedDateRangeFr = null;
+
+          // Génération du daterange_fr s'il est vide/null dans les données d'origine
+          if ((!event.dateRangeFr || event.dateRangeFr.trim() === '') && finalTimings && finalTimings.length > 0) {
+            generatedDateRangeFr = generateDateRangeFrString(finalTimings);
+            console.log(`  [INFO] Event ${eventId} : daterange_fr généré -> "${generatedDateRangeFr}"`);
+          }
+
+          // Mise à jour de la base de données selon 4 scénarios (avec/sans timings calculés, avec/sans daterange_fr généré)
+          if (calculatedTimings && calculatedTimings.length > 0) {
+            console.log(`  [INFO] Event ${eventId} : Timings mis à jour (Nbr: ${calculatedTimings.length}) et Vectorisé.`);
+            if (generatedDateRangeFr) {
+              await prisma.$executeRawUnsafe(
+                'UPDATE events SET embedding = $1::vector, timings = $3::jsonb, daterange_fr = $4 WHERE uid = $2',
+                embeddingString, eventId, JSON.stringify(calculatedTimings), generatedDateRangeFr
+              );
+            } else {
+              await prisma.$executeRawUnsafe(
+                'UPDATE events SET embedding = $1::vector, timings = $3::jsonb WHERE uid = $2',
+                embeddingString, eventId, JSON.stringify(calculatedTimings)
+              );
+            }
           } else {
-            console.log(`  [INFO] Event ${eventId} : Vectorisé (Timings conservés ou ignorés).`);
-            await prisma.$executeRawUnsafe(
-              'UPDATE events SET embedding = $1::vector WHERE uid = $2',
-              embeddingString,
-              eventId
-            );
+            console.log(`  [INFO] Event ${eventId} : Vectorisé (Colonne timings d'origine conservée).`);
+            if (generatedDateRangeFr) {
+              await prisma.$executeRawUnsafe(
+                'UPDATE events SET embedding = $1::vector, daterange_fr = $3 WHERE uid = $2',
+                embeddingString, eventId, generatedDateRangeFr
+              );
+            } else {
+              await prisma.$executeRawUnsafe(
+                'UPDATE events SET embedding = $1::vector WHERE uid = $2',
+                embeddingString, eventId
+              );
+            }
           }
 
           processedInBatch++;
@@ -379,7 +461,7 @@ Analyse 'daterange_texte' et 'date_debut_reference' pour scinder la temporalité
         }
       }
 
-      console.log(`Professional Batch ${batchIdx + 1}/${totalBatches} completed. Success: ${processedInBatch}, Failures: ${failedInBatch}`);
+      console.log(`Batch ${batchIdx + 1}/${totalBatches} completed. Success: ${processedInBatch}, Failures: ${failedInBatch}`);
 
       // Pause entre les batchs pour respecter les quotas
       if (batchIdx < totalBatches - 1) {

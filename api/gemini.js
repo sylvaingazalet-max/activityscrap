@@ -1,12 +1,10 @@
 /**
- * Gemini API Route Handler - Version Hybride (pgvector & Chrono-node)
+ * Gemini API Route Handler - Version Hybride Directe (UI Dates + pgvector)
  *
- * Serverless function that:
- * 1. Parses date via LLM with a 2-attempt retry policy and a 5s delay between attempts.
- * 2. Generates a Gemini vector embedding from the cleaned prompt.
- * 3. Executes a hybrid SQL query: strict date overlap filtering on the `timings` JSONB array
- * AND pgvector cosine similarity sorting (<=>).
- * 4. Streams events directly to client (LLM generation skipped for speed).
+ * 1. Récupère les dates strictes envoyées par le frontend.
+ * 2. Génère un embedding Gemini à partir du prompt.
+ * 3. Exécute une requête SQL hybride (chevauchement dates + similarité cosinus).
+ * 4. Stream les résultats au client.
  */
 
 const path = require('path');
@@ -19,105 +17,72 @@ const { validatePayload } = require('../lib/validators');
 const { getPrismaClient } = require('../lib/prismaClient');
 const logger = require('../lib/logger');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { parseTemporalPrompt } = require('../lib/temporalParser');
 
 // Check for API key
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-// ============================================================================
-// Constants & Helpers
-// ============================================================================
 const AI_API_CONFIG = {
   embeddingModel: 'gemini-embedding-2'
 };
-
-// Helper function to introduce a delay (Promise-based setTimeout)
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // SSE Response Helper
 function sendEvent(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-/**
- * Main API Route Handler
- */
 module.exports = async (req, res) => {
   const contextLog = logger.createLogger('api/gemini');
   contextLog.info('API route called', { method: req.method, url: req.url });
 
-  // Validate HTTP method
   if (req.method !== 'POST') {
-    contextLog.warn('Invalid HTTP method', { method: req.method });
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed. Use POST.' }));
     return;
   }
 
-  // Validate request payload
+  // NOTE: Tu devras peut-être mettre à jour validatePayload pour accepter startDate et endDate
   const validationError = validatePayload(req.body);
   if (validationError) {
-    contextLog.warn('Validation failed', { error: validationError });
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: validationError }));
     return;
   }
 
-  const { prompt, targetDate } = req.body || {};
+  // Récupération des données depuis l'UI
+  const { prompt, startDate, endDate } = req.body || {};
 
-  // Setup Server-Sent Events stream
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive'
   });
 
-  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse temporelle de votre demande...' } });
+  sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Recherche de vos événements...' } });
 
   const prisma = await getPrismaClient();
-  const targetDateRef = targetDate ? new Date(targetDate) : new Date();
 
   // ============================================================================
-  // 1. PARSING TEMPOREL PAR IA (Avec Retry & Pause de 5 secondes)
+  // 1. FORMATAGE DES DATES (Directement depuis l'input UI)
   // ============================================================================
   let startOfDay = null;
   let endOfDay = null;
-  let searchForEmbedding = prompt;
-  
-  let attempts = 0;
-  const maxAttempts = 2;
-  let parsingSuccess = false;
 
-  while (attempts < maxAttempts && !parsingSuccess) {
-    attempts++;
-    try {
-      contextLog.info(`Parsing temporal logic using LLM (Attempt ${attempts}/${maxAttempts})`);
-      const parsedData = await parseTemporalPrompt(prompt, targetDateRef, genAI);
-      
-      startOfDay = parsedData.startOfDay;
-      endOfDay = parsedData.endOfDay;
-      searchForEmbedding = parsedData.searchForEmbedding;
-      parsingSuccess = true;
+  if (startDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0); // Début de journée
+    startOfDay = start.toISOString();
+  }
 
-    } catch (err) {
-      contextLog.warn(`Temporal parsing attempt ${attempts} failed`, err);
-      
-      // Si on a épuisé toutes les tentatives, on bloque tout et on renvoie l'erreur
-      if (attempts >= maxAttempts) {
-        contextLog.error('Temporal parsing block failed after 2 attempts. Aborting request.');
-        sendEvent(res, { 
-          type: 'error', 
-          data: { error: "L'analyse temporelle via Gemini a échoué après plusieurs tentatives. Impossible de traiter la demande." } 
-        });
-        res.end();
-        return;
-      }
-
-      // Si le premier essai a échoué, on patiente 5 secondes avant le retry
-      contextLog.info('Waiting 5 seconds before retrying temporal parsing...');
-      await sleep(5000);
-    }
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999); // Fin de journée
+    endOfDay = end.toISOString();
+  } else if (startDate) {
+    // Si seule la date de début est fournie, on cherche uniquement sur cette journée précise
+    const end = new Date(startDate);
+    end.setHours(23, 59, 59, 999);
+    endOfDay = end.toISOString();
   }
 
   // ============================================================================
@@ -126,11 +91,11 @@ module.exports = async (req, res) => {
   let vectorString = null;
   
   try {
-    contextLog.info('Generating embedding for the search query', { textToEmbed: searchForEmbedding });
+    contextLog.info('Generating embedding for the search query', { textToEmbed: prompt });
     const embeddingModel = genAI.getGenerativeModel({ model: AI_API_CONFIG.embeddingModel });
     
     const embeddingResult = await embeddingModel.embedContent({
-      content: { parts: [{ text: searchForEmbedding }] },
+      content: { parts: [{ text: prompt }] },
       outputDimensionality: 768
     });
 
@@ -139,9 +104,12 @@ module.exports = async (req, res) => {
     }
   } catch (err) {
     contextLog.error('Failed to generate embedding at runtime', err);
+    sendEvent(res, { type: 'error', data: { error: 'Erreur lors de la compréhension de votre demande (IA indisponible).' } });
+    res.end();
+    return;
   }
 
-  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche hybride (Date SQL + pgvector) en cours...' } });
+  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche hybride en cours...' } });
 
   let fallbackRecommendations = [];
 
@@ -160,6 +128,7 @@ module.exports = async (req, res) => {
 
     if (vectorString) {
       if (startOfDay && endOfDay) {
+        // Recherche avec un filtre strict de date ET un tri par pertinence sémantique
         dbEvents = await prisma.$queryRaw`
           SELECT 
             e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
@@ -181,6 +150,7 @@ module.exports = async (req, res) => {
           LIMIT 50;
         `;
       } else {
+        // Recherche sur le catalogue complet (sans dates sélectionnées)
         dbEvents = await prisma.$queryRaw`
           SELECT 
             e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
@@ -194,16 +164,6 @@ module.exports = async (req, res) => {
           LIMIT 50;
         `;
       }
-    } else {
-      contextLog.warn('Embedding missing, fallback to traditional Prisma match');
-      const whereClause = {};
-      if (startOfDay) {
-        whereClause.firstDateBegin = { gte: new Date(startOfDay) };
-      }
-      dbEvents = await prisma.events.findMany({
-        where: whereClause,
-        take: 50
-      });
     }
 
     if (dbEvents.length > 0) {
@@ -227,23 +187,23 @@ module.exports = async (req, res) => {
   }
 
   // ============================================================================
-  // 4. RETOUR DIRECT DES RÉSULTATS (Bypass du LLM)
+  // 4. RETOUR DIRECT DES RÉSULTATS
   // ============================================================================
   try {
-    contextLog.info('Sending direct DB results without LLM formatting');
-
     let parsedResult;
     let extraEvents = [];
 
     if (fallbackRecommendations.length > 0) {
       parsedResult = {
-        message_intro: "Voici les événements sur le créneau horaire choisi, triés par pertinence:",
+        message_intro: startOfDay 
+          ? "Voici les événements sur le créneau choisi, triés par pertinence :" 
+          : "Voici les événements pertinents, triés pour vous :",
         recommendations: fallbackRecommendations.slice(0, 5)
       };
       extraEvents = fallbackRecommendations.slice(5);
     } else {
       parsedResult = {
-        message_intro: "Désolé, nous n'avons trouvé aucun événement dans le créneau souhaité",
+        message_intro: "Désolé, nous n'avons trouvé aucun événement dans le créneau souhaité.",
         recommendations: []
       };
     }
