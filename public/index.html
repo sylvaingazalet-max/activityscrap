@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>La boussole lilloise</title>
+    <title>La boussole de Lille</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧭</text></svg>">
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
     
     <style>
         :root {
-            --primary: #d97706; /* Un orange chaud/ambré */
+            --primary: #d97706;
             --primary-hover: #b45309;
             --bg-color: #f3f4f6;
             --card-bg: #ffffff;
@@ -40,19 +42,24 @@
             box-sizing: border-box;
         }
 
+        /* Correction du titre h1 pour que l'émoji garde ses couleurs */
         h1 {
             font-size: 28px;
             font-weight: 800;
             text-align: center;
             margin-top: 0;
             margin-bottom: 30px;
-            background: linear-gradient(135deg, #ea580c, #db2777);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
+        }
+
+        /* Le dégradé ne s'applique désormais qu'au texte dans le span */
+        h1 span {
+            background: linear-gradient(135deg, #ea580c, #db2777);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .section {
@@ -67,14 +74,13 @@
             font-size: 15px;
         }
 
-        /* Champs de saisie */
         input[type="text"], textarea {
             width: 100%;
             padding: 14px 16px;
             border: 1px solid var(--border-color);
             border-radius: 10px;
             box-sizing: border-box;
-            font-size: 16px; /* 16px évite le zoom auto sur iOS */
+            font-size: 16px;
             font-family: inherit;
             background-color: #f9fafb;
             transition: all 0.2s ease;
@@ -92,7 +98,6 @@
             resize: vertical;
         }
 
-        /* Bouton */
         button.primary-btn {
             display: block;
             width: 100%;
@@ -123,7 +128,6 @@
             cursor: not-allowed;
         }
 
-        /* Statut et Résultats */
         #status {
             margin-top: 20px;
             font-size: 15px;
@@ -137,7 +141,6 @@
             display: none;
         }
 
-        /* Cartes d'événements */
         .event-card {
             background: #fff;
             border: 1px solid var(--border-color);
@@ -196,7 +199,6 @@
         }
         .event-link:hover { text-decoration: underline; }
 
-        /* Spinner */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -210,7 +212,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Mobile Adjustments */
         @media (max-width: 480px) {
             .container { padding: 25px 20px; }
             h1 { font-size: 24px; }
@@ -219,7 +220,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🧭 La boussole lilloise</h1>
+        <h1>🧭 <span>La boussole de Lille</span></h1>
         
         <div class="section">
             <label for="dateRange">Quand voulez-vous sortir ?</label>
@@ -240,14 +241,13 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
     <script>
-        // Initialisation du calendrier interactif
         const datePicker = flatpickr("#dateRange", {
-            mode: "range",          // Permet de sélectionner de Date A à Date B
-            locale: "fr",           // En français
-            minDate: "today",       // On ne peut pas chercher dans le passé
-            dateFormat: "Y-m-d",    // Format caché pour l'API
-            altInput: true,         // Crée un faux champ visuellement plus beau
-            altFormat: "j F Y",     // Format d'affichage (ex: 12 Juin 2026)
+            mode: "range",
+            locale: "fr",
+            minDate: "today",
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "j F Y",
         });
 
         const searchBtn = document.getElementById('searchBtn');
@@ -313,15 +313,12 @@
         searchBtn.onclick = async () => {
             const prompt = document.getElementById('prompt').value.trim();
             
-            // Extraction des dates depuis Flatpickr
             const selectedDates = datePicker.selectedDates;
             let startDate = "";
             let endDate = "";
             
             if (selectedDates.length > 0) {
-                // Formate la date de début pour l'API (YYYY-MM-DD)
                 startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
-                // S'il y a une date de fin, on la prend, sinon c'est la même que la date de début
                 endDate = selectedDates[1] ? flatpickr.formatDate(selectedDates[1], "Y-m-d") : startDate;
             }
 
