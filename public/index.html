@@ -112,34 +112,63 @@
         const resultsDiv = document.getElementById('results');
         const statusDiv = document.getElementById('status');
 
-        function renderEvents(data) {
+        function createCardHtml(rec) {
+            const imageHtml = rec.image_url 
+                ? `<img src="${rec.image_url}" alt="${rec.titre}" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px;">` 
+                : '';
+            return `
+                <div style="background: #fff; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    ${imageHtml}
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #111;">${rec.titre}</h3>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                        <span>📍 ${rec.lieu}</span><br>
+                        <span>📅 ${rec.date_horaire}</span><br>
+                        <span>💶 ${rec.tarif}</span>
+                    </div>
+                    <p style="margin: 0 0 15px 0; font-size: 15px;">${rec.chapo}</p>
+                    ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" style="display: inline-block; margin-top: 15px; font-size: 14px; color: #111; font-weight: 500;">En savoir plus / Réserver →</a>` : ''}
+                </div>
+            `;
+        }
+
+        function renderEvents(data, extraEvents = []) {
             let html = `<p style="font-size: 16px; font-weight: 500; color: #111; margin-bottom: 20px;">👋 ${data.message_intro}</p>`;
             
+            // Affichage initial des 5 recommandations générées/triées par le LLM
             if (data.recommendations && data.recommendations.length > 0) {
                 data.recommendations.forEach(rec => {
-                    // Préparation de la balise image si l'URL est fournie
-                    const imageHtml = rec.image_url 
-                        ? `<img src="${rec.image_url}" alt="${rec.titre}" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px; margin-bottom: 15px;">` 
-                        : '';
-
-                    html += `
-                        <div style="background: #fff; border: 1px solid #eaeaea; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                            ${imageHtml}
-                            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #111;">${rec.titre}</h3>
-                            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
-                                <span>📍 ${rec.lieu}</span><br>
-                                <span>📅 ${rec.date_horaire}</span><br>
-                                <span>💶 ${rec.tarif}</span>
-                            </div>
-                            <p style="margin: 0 0 15px 0; font-size: 15px;">${rec.chapo}</p>
-                            ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" style="display: inline-block; margin-top: 15px; font-size: 14px; color: #111; font-weight: 500;">En savoir plus / Réserver →</a>` : ''}
-                        </div>
-                    `;
+                    html += createCardHtml(rec);
                 });
             } else {
                 html += `<p>Aucun événement ne correspond à cette recherche.</p>`;
             }
+
+            // Gestion de l'affichage masqué des événements supplémentaires restants
+            if (extraEvents && extraEvents.length > 0) {
+                html += `<div id="extraEventsContainer" style="display: none; margin-top: 20px;">`;
+                extraEvents.forEach(rec => {
+                    html += createCardHtml(rec);
+                });
+                html += `</div>`;
+                html += `<button id="toggleExtraBtn" style="margin-top: 15px; background: #eee; color: #333; padding: 10px 14px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; width: 100%; font-weight: 500;">Voir plus d'événements (${extraEvents.length})</button>`;
+            }
+
             resultsDiv.innerHTML = html;
+
+            // Activation de l'action du bouton "Voir plus"
+            const toggleBtn = document.getElementById('toggleExtraBtn');
+            if (toggleBtn) {
+                toggleBtn.onclick = () => {
+                    const container = document.getElementById('extraEventsContainer');
+                    if (container.style.display === 'none') {
+                        container.style.display = 'block';
+                        toggleBtn.textContent = "Voir moins d'événements";
+                    } else {
+                        container.style.display = 'none';
+                        toggleBtn.textContent = `Voir plus d'événements (${extraEvents.length})`;
+                    }
+                };
+            }
         }
 
         searchBtn.onclick = async () => {
@@ -185,7 +214,7 @@
                                 } else if (event.type === 'result') {
                                     statusDiv.textContent = 'Suggestions générées !';
                                     resultsDiv.style.display = 'block';
-                                    renderEvents(event.data.result);
+                                    renderEvents(event.data.result, event.data.extra_events);
                                 } else if (event.type === 'error') {
                                     statusDiv.textContent = '❌ Erreur : ' + event.data.error;
                                 }

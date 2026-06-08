@@ -34,16 +34,14 @@ const AI_API_CONFIG = {
   embeddingModel: 'gemini-embedding-2'
 };
 
-// ============================================================================
-// SSE Response Helpers
-// ============================================================================
+// SSE Response Helper
 function sendEvent(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
-// ============================================================================
-// Main Handler
-// ============================================================================
+/**
+ * Main API Route Handler
+ */
 module.exports = async (req, res) => {
   const contextLog = logger.createLogger('api/gemini');
   contextLog.info('API route called', { method: req.method, url: req.url });
@@ -66,6 +64,9 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Safe extraction of properties from req.body
+  const { prompt, targetDate } = req.body || {};
+
   // Setup Server-Sent Events stream
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -73,19 +74,18 @@ module.exports = async (req, res) => {
     'Connection': 'keep-alive'
   });
 
-  const { prompt } = req.body || {};
-
   sendEvent(res, { type: 'progress', data: { state: 'initializing', message: 'Analyse temporelle de votre demande...' } });
 
+  // Initialize Database Client with await
   const prisma = await getPrismaClient();
 
-  // Contexte temporel calé sur Paris
-  const targetDateRef = new Date();
+  // Setup Target baseline reference date
+  const targetDateRef = targetDate ? new Date(targetDate) : new Date();
   const todayStr = targetDateRef.toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }); 
   const currentYear = new Date(targetDateRef.toLocaleString('en-US', { timeZone: 'Europe/Paris' })).getFullYear();
 
   // ============================================================================
-  // 1. PARSING TEMPOREL PAR IA & FALLBACK LOCAL
+  // 1. PARSING TEMPOREL PAR IA & FINALISATION CHRONO-NODE
   // ============================================================================
   let startOfDay = null;
   let endOfDay = null;
@@ -95,7 +95,6 @@ module.exports = async (req, res) => {
   try {
     contextLog.info('Parsing temporal logic using LLM with local fallback');
     
-    // Ajout du await et passage de genAI pour activer la détection par Gemini
     const parsedData = await parseTemporalPrompt(prompt, targetDateRef, genAI);
     
     startOfDay = parsedData.startOfDay;
@@ -168,11 +167,11 @@ module.exports = async (req, res) => {
             AND EXISTS (
               SELECT 1 
               FROM jsonb_array_elements(e.timings::jsonb) AS t(timing)
-              WHERE (t.timing->>'begin')::timestamp <= ${endOfDay}
-                AND (t.timing->>'end')::timestamp >= ${startOfDay}
+              WHERE (t.timing->>'begin')::timestamp <= ${endOfDay}::timestamp
+                AND (t.timing->>'end')::timestamp >= ${startOfDay}::timestamp
             )
           ORDER BY e.embedding <=> ${vectorString}::vector
-          LIMIT 15;
+          LIMIT 50;
         `;
       } else {
         contextLog.info('Query with pgvector sorting only (No date filter detected)');
@@ -186,19 +185,18 @@ module.exports = async (req, res) => {
           LEFT JOIN locations l ON e.location_uid = l.location_uid
           WHERE e.embedding IS NOT NULL
           ORDER BY e.embedding <=> ${vectorString}::vector
-          LIMIT 15;
+          LIMIT 50;
         `;
       }
     } else {
       contextLog.warn('Embedding missing, fallback to traditional Prisma match');
       const whereClause = {};
       if (startOfDay) {
-        whereClause.firstDateBegin = { gte: startOfDay };
+        whereClause.firstDateBegin = { gte: new Date(startOfDay) };
       }
-      dbEvents = await prisma.event.findMany({
+      dbEvents = await prisma.events.findMany({
         where: whereClause,
-        include: { location: true },
-        take: 15
+        take: 50
       });
     }
 
@@ -231,7 +229,8 @@ module.exports = async (req, res) => {
         url_reservation: e.canonicalUrl
       }));
 
-      finalPrompt += `\n\nVoici les événements correspondants trouvés (triés par pertinence sémantique) :\n${JSON.stringify(formattedEvents, null, 2)}`;
+      const top5Events = formattedEvents.slice(0, 5);
+      finalPrompt += `\n\nVoici les 5 meilleurs événements correspondants trouvés (triés par pertinence sémantique) :\n${JSON.stringify(top5Events, null, 2)}`;
     } else {
       finalPrompt += `\n\nAucun événement n'a été trouvé dans la base de données pour la date ou les critères demandés.`;
     }
@@ -263,17 +262,10 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
   ]
 }`;
 
-  const isTruthy = (val) => {
-    if (val === true || val === 1) return true;
-    if (typeof val !== 'string') return false;
-    const cleaned = val.trim().toLowerCase().replace(/['"]/g, '');
-    return cleaned === 'true' || cleaned === '1' || cleaned === 'yes';
-  };
-
-  const isDebugMode = isTruthy(process.env.RETURN_DEBUG_PROMPT) || isTruthy(process.env.DEBUG);
+  const isDebugMode = process.env.RETURN_DEBUG_PROMPT === 'true' || process.env.DEBUG === 'true';
 
   // ============================================================================
-  // 4. GENERATE RECOMMENDATIONS (Appel Gemini de rendu de texte avec Retry)
+  // 4. GENERATE RECOMMENDATIONS (Appel Gemini)
   // ============================================================================
   try {
     contextLog.info('Starting AI content generation');
@@ -304,7 +296,7 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
             
             const fallbackResponse = {
               message_intro: "Oups, notre IA est actuellement très sollicitée et n'a pas pu personnaliser votre réponse 🤖. Voici tout de même la sélection brute des événements trouvés :",
-              recommendations: fallbackRecommendations.length > 0 ? fallbackRecommendations : []
+              recommendations: fallbackRecommendations.slice(0, 5)
             };
 
             text = JSON.stringify(fallbackResponse);
@@ -325,7 +317,8 @@ Tu dois STRICTEMENT renvoyer un objet JSON valide, qui aura filtré les doublons
         throw new Error('La réponse de l\'IA n\'a pas pu être formatée en JSON valide.');
       }
 
-      sendEvent(res, { type: 'result', data: { result: parsedResult, raw } });
+      const extraEvents = fallbackRecommendations.slice(5);
+      sendEvent(res, { type: 'result', data: { result: parsedResult, extra_events: extraEvents, raw } });
     }
   } catch (err) {
     contextLog.error('Content generation failed', err);
