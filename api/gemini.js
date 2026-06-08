@@ -2,7 +2,7 @@
  * Gemini API Route Handler - Version Hybride (pgvector & Chrono-node)
  *
  * Serverless function that:
- * 1. Parses date via LLM (with local chrono-node fallback) from user input.
+ * 1. Parses date via LLM with a 2-attempt retry policy and a 5s delay between attempts.
  * 2. Generates a Gemini vector embedding from the cleaned prompt.
  * 3. Executes a hybrid SQL query: strict date overlap filtering on the `timings` JSONB array
  * AND pgvector cosine similarity sorting (<=>).
@@ -26,11 +26,14 @@ const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 // ============================================================================
-// Constants
+// Constants & Helpers
 // ============================================================================
 const AI_API_CONFIG = {
   embeddingModel: 'gemini-embedding-2'
 };
+
+// Helper function to introduce a delay (Promise-based setTimeout)
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // SSE Response Helper
 function sendEvent(res, payload) {
@@ -76,22 +79,45 @@ module.exports = async (req, res) => {
   const targetDateRef = targetDate ? new Date(targetDate) : new Date();
 
   // ============================================================================
-  // 1. PARSING TEMPOREL PAR IA & FINALISATION CHRONO-NODE
+  // 1. PARSING TEMPOREL PAR IA (Avec Retry & Pause de 5 secondes)
   // ============================================================================
   let startOfDay = null;
   let endOfDay = null;
   let searchForEmbedding = prompt;
+  
+  let attempts = 0;
+  const maxAttempts = 2;
+  let parsingSuccess = false;
 
-  try {
-    contextLog.info('Parsing temporal logic using LLM with local fallback');
-    const parsedData = await parseTemporalPrompt(prompt, targetDateRef, genAI);
-    
-    startOfDay = parsedData.startOfDay;
-    endOfDay = parsedData.endOfDay;
-    searchForEmbedding = parsedData.searchForEmbedding;
+  while (attempts < maxAttempts && !parsingSuccess) {
+    attempts++;
+    try {
+      contextLog.info(`Parsing temporal logic using LLM (Attempt ${attempts}/${maxAttempts})`);
+      const parsedData = await parseTemporalPrompt(prompt, targetDateRef, genAI);
+      
+      startOfDay = parsedData.startOfDay;
+      endOfDay = parsedData.endOfDay;
+      searchForEmbedding = parsedData.searchForEmbedding;
+      parsingSuccess = true;
 
-  } catch (err) {
-    contextLog.error('Temporal parsing block failed, keeping original prompt', err);
+    } catch (err) {
+      contextLog.warn(`Temporal parsing attempt ${attempts} failed`, err);
+      
+      // Si on a épuisé toutes les tentatives, on bloque tout et on renvoie l'erreur
+      if (attempts >= maxAttempts) {
+        contextLog.error('Temporal parsing block failed after 2 attempts. Aborting request.');
+        sendEvent(res, { 
+          type: 'error', 
+          data: { error: "L'analyse temporelle via Gemini a échoué après plusieurs tentatives. Impossible de traiter la demande." } 
+        });
+        res.end();
+        return;
+      }
+
+      // Si le premier essai a échoué, on patiente 5 secondes avant le retry
+      contextLog.info('Waiting 5 seconds before retrying temporal parsing...');
+      await sleep(5000);
+    }
   }
 
   // ============================================================================
@@ -183,7 +209,7 @@ module.exports = async (req, res) => {
     if (dbEvents.length > 0) {
       fallbackRecommendations = dbEvents.map(e => ({
         identifiant: e.id,
-        titre: e.titleFr || e.title_fr, // Handling both queryRaw and findMany formats
+        titre: e.titleFr || e.title_fr, 
         chapo: e.descriptionFr || e.description_fr || "Plus de détails sur la page de l'événement.",
         image_url: e.image,
         lieu: e.locationName ? `${e.locationName} ${e.locationDistrict ? `(${e.locationDistrict})` : ''}` : 'Lille',
@@ -211,13 +237,13 @@ module.exports = async (req, res) => {
 
     if (fallbackRecommendations.length > 0) {
       parsedResult = {
-        message_intro: "Voici les événements qui correspondent le mieux à votre recherche :",
+        message_intro: "Voici les événements sur le créneau horaire choisi, triés par pertinence:",
         recommendations: fallbackRecommendations.slice(0, 5)
       };
       extraEvents = fallbackRecommendations.slice(5);
     } else {
       parsedResult = {
-        message_intro: "Désolé, nous n'avons trouvé aucun événement correspondant à votre recherche pour le moment.",
+        message_intro: "Désolé, nous n'avons trouvé aucun événement dans le créneau souhaité",
         recommendations: []
       };
     }

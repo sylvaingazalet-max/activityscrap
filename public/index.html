@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Suggestions d'activités</title>
+    <title>La boussole lilloise</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -97,12 +97,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>Suggestions d'activités</h1>
+        <!-- Titre personnalisé -->
+        <h1>La boussole lilloise</h1>
         <div class="section">
-            <label for="prompt">Que souhaitez-vous faire ?</label>
-            <textarea id="prompt" placeholder="Ex : j'aimerai écouter de la musique avec des amis samedi soir"></textarea>
+            <!-- Champ de saisie & Exemple personnalisés -->
+            <label for="prompt">De quoi avez-vous envie aujourd'hui ?</label>
+            <textarea id="prompt" placeholder="Ex : Exposition avec des enfants demain matin"></textarea>
         </div>
-        <button id="searchBtn">Proposer des idées</button>
+        <!-- Bouton d'action personnalisé -->
+        <button id="searchBtn">Trouver mon bonheur</button>
         <div id="status"></div>
         <div id="results"></div>
     </div>
@@ -131,10 +134,10 @@
             `;
         }
 
+        // Le texte de résultats reste inchangé (on touche pas !)
         function renderEvents(data, extraEvents = []) {
             let html = `<p style="font-size: 16px; font-weight: 500; color: #111; margin-bottom: 20px;">👋 ${data.message_intro}</p>`;
             
-            // Affichage initial des 5 recommandations générées/triées par le LLM
             if (data.recommendations && data.recommendations.length > 0) {
                 data.recommendations.forEach(rec => {
                     html += createCardHtml(rec);
@@ -143,7 +146,6 @@
                 html += `<p>Aucun événement ne correspond à cette recherche.</p>`;
             }
 
-            // Gestion de l'affichage masqué des événements supplémentaires restants
             if (extraEvents && extraEvents.length > 0) {
                 html += `<div id="extraEventsContainer" style="display: none; margin-top: 20px;">`;
                 extraEvents.forEach(rec => {
@@ -155,7 +157,6 @@
 
             resultsDiv.innerHTML = html;
 
-            // Activation de l'action du bouton "Voir plus"
             const toggleBtn = document.getElementById('toggleExtraBtn');
             if (toggleBtn) {
                 toggleBtn.onclick = () => {
@@ -212,7 +213,8 @@
                                 if (event.type === 'progress') {
                                     statusDiv.innerHTML = `<div class="loading-spinner"></div> Recherche d'idées en cours...`;
                                 } else if (event.type === 'result') {
-                                    statusDiv.textContent = 'Suggestions générées !';
+                                    // État de succès mis à jour avec votre texte personnalisé
+                                    statusDiv.textContent = 'Tadam !';
                                     resultsDiv.style.display = 'block';
                                     renderEvents(event.data.result, event.data.extra_events);
                                 } else if (event.type === 'error') {
