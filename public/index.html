@@ -211,31 +211,42 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Styles pour le footer et la modale légale */
+        /* Styles pour le footer et les modales */
         .site-footer {
-            margin-top: 20px;
+            margin-top: 25px;
             text-align: center;
-            font-size: 12px;
+            font-size: 13px;
             width: 100%;
             max-width: 600px;
+            color: var(--text-muted);
         }
 
-        .site-footer button {
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .site-footer button, .site-footer a {
             background: none;
             border: none;
             color: var(--text-muted);
             cursor: pointer;
-            padding: 5px;
+            padding: 0;
             font-family: inherit;
+            font-size: 13px;
+            text-decoration: none;
             transition: color 0.2s ease;
         }
 
-        .site-footer button:hover {
+        .site-footer button:hover, .site-footer a:hover {
             color: var(--text-main);
             text-decoration: underline;
         }
 
-        .legal-modal {
+        .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -250,10 +261,12 @@
             background: white;
             padding: 30px;
             border-radius: 12px;
-            max-width: 450px;
+            max-width: 500px;
             width: 100%;
             position: relative;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .close-modal {
@@ -268,6 +281,12 @@
         }
 
         .close-modal:hover { color: var(--text-main); }
+
+        .modal-content h2 { margin-top: 0; font-size: 22px; color: var(--text-main); }
+        .modal-content h3 { font-size: 16px; margin-bottom: 8px; color: var(--text-main); margin-top: 20px; }
+        .modal-content p, .modal-content li { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+        .modal-content ul { padding-left: 20px; margin-top: 5px; }
+        .modal-content li { margin-bottom: 8px; }
 
         @media (max-width: 480px) {
             .container { padding: 25px 20px; }
@@ -294,29 +313,69 @@
         <div id="results"></div>
     </div>
 
-    <!-- Footer discret -->
     <footer class="site-footer">
-        <button id="openLegalBtn">Mentions légales</button>
+        <div class="footer-links">
+            <button id="openHowBtn">Comment ça marche ?</button>
+            <button id="openEcoBtn">Impact environnemental</button>
+            <button id="openLegalBtn">Mentions légales</button>
+        </div>
+        <div>
+            Contact : <a href="mailto:laboussoledelille@proton.me">laboussoledelille@proton.me</a>
+        </div>
     </footer>
 
-    <!-- Modale Mentions Légales -->
-    <div id="legalModal" class="legal-modal">
+    <div id="howModal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="closeHowBtn" class="close-modal">✕</button>
+            <h2>Comment ça marche ?</h2>
+            <p><strong>La recherche vectorielle</strong></p>
+            <ul>
+                <li><strong>Collecte :</strong> Nous récupérons automatiquement les événements lillois depuis OpenAgenda et Ticketmaster.</li>
+                <li><strong>Synthèse :</strong> Une IA ultra-légère (Gemini Flash Lite) génère un résumé très court de chaque événement.</li>
+                <li><strong>Vectorisation :</strong> Ce résumé est transformé en coordonnées mathématiques (un "vecteur").</li>
+                <li><strong>Recherche :</strong> Votre requête est elle aussi convertie en coordonnées.</li>
+                <li><strong>Résultat :</strong> Une simple requête en base de données trouve instantanément les événements dont les coordonnées sont les plus proches de votre envie.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="ecoModal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="closeEcoBtn" class="close-modal">✕</button>
+            <h2>Notre impact environnemental</h2>
+            <p>L'IA consomme de l'énergie. Voici l'empreinte carbone brute de notre moteur, en toute transparence et hors compensation des fournisseurs cloud :</p>
+            
+            <h3>L'impact à l'unité</h3>
+            <ul>
+                <li><strong>1 événement intégré</strong> (collecte, résumé par Gemini Flash Lite et vectorisation) : 0,1 à 0,2 g de CO2.</li>
+                <li><strong>1 recherche utilisateur</strong> (vectorisation de la requête et comparaison en base) : 0,01 à 0,05 g de CO2.</li>
+            </ul>
+
+            <h3>Le bilan à grande échelle</h3>
+            <ul>
+                <li><strong>1000 événements intégrés</strong> : 100 à 200 g de CO2.</li>
+                <li><strong>1000 recherches</strong> : 10 à 50 g de CO2.</li>
+            </ul>
+
+            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                <p style="margin: 0; color: var(--text-main);"><strong>Pour comparer :</strong> Cumuler l'intégration de 1000 événements et 1000 recherches génère la même empreinte carbone que de laisser une ampoule LED allumée pendant deux semaines. Un impact réel, mais strictement minimisé grâce au choix d'un modèle d'IA "Lite" ultra-optimisé.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="legalModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeLegalBtn" class="close-modal">✕</button>
-            <h2 style="margin-top: 0; font-size: 20px;">Mentions légales</h2>
+            <h2>Mentions légales</h2>
             
-            <h3 style="font-size: 16px; margin-bottom: 5px;">Éditeur du site</h3>
-            <p style="font-size: 14px; margin-top: 0; color: var(--text-muted);">
-                Ce site est édité à titre personnel. L'éditeur a fait le choix de garder l'anonymat. Conformément à la loi pour la confiance dans l'économie numérique (LCEN), ses coordonnées exactes ont été transmises à l'hébergeur.
-            </p>
+            <h3>Éditeur du site</h3>
+            <p>Ce site est édité à titre personnel. L'éditeur a fait le choix de garder l'anonymat. Conformément à la loi pour la confiance dans l'économie numérique (LCEN), ses coordonnées exactes ont été transmises à l'hébergeur.</p>
 
-            <h3 style="font-size: 16px; margin-bottom: 5px;">Hébergement</h3>
-            <p style="font-size: 14px; margin-top: 0; color: var(--text-muted);">
-                Ce site est hébergé par Vercel Inc.<br>
-                440 N Barranca Ave #4133<br>
-                Covina, CA 91723, États-Unis<br>
-                Contact : privacy@vercel.com
-            </p>
+            <h3>Hébergement</h3>
+            <p>Ce site est hébergé par Vercel Inc.<br>
+            440 N Barranca Ave #4133<br>
+            Covina, CA 91723, États-Unis<br>
+            Contact : privacy@vercel.com</p>
         </div>
     </div>
 
@@ -324,14 +383,26 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
     <script>
-        // --- Gestion de la modale des mentions légales ---
-        const modal = document.getElementById('legalModal');
-        const openBtn = document.getElementById('openLegalBtn');
-        const closeBtn = document.getElementById('closeLegalBtn');
+        // --- Gestion des modales (Légales, Fonctionnement, Écologie) ---
+        function setupModal(modalId, openBtnId, closeBtnId) {
+            const modal = document.getElementById(modalId);
+            document.getElementById(openBtnId).onclick = () => modal.style.display = 'flex';
+            document.getElementById(closeBtnId).onclick = () => modal.style.display = 'none';
+            return modal;
+        }
 
-        openBtn.onclick = () => modal.style.display = 'flex';
-        closeBtn.onclick = () => modal.style.display = 'none';
-        window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; }
+        const modals = [
+            setupModal('legalModal', 'openLegalBtn', 'closeLegalBtn'),
+            setupModal('howModal', 'openHowBtn', 'closeHowBtn'),
+            setupModal('ecoModal', 'openEcoBtn', 'closeEcoBtn')
+        ];
+
+        // Fermer les modales si on clique en dehors du contenu
+        window.onclick = (e) => {
+            modals.forEach(modal => {
+                if (e.target === modal) modal.style.display = 'none';
+            });
+        }
 
         // --- Logique principale de l'application ---
         const datePicker = flatpickr("#dateRange", {
