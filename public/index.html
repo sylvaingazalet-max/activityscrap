@@ -226,7 +226,6 @@
             justify-content: center;
             flex-wrap: wrap;
             gap: 15px;
-            margin-bottom: 15px;
         }
 
         .site-footer button, .site-footer a {
@@ -305,7 +304,7 @@
 
         <div class="section">
             <label for="prompt">De quoi avez-vous envie ?</label>
-            <textarea id="prompt" placeholder="Ex : Activité chill, expo avec enfants, one man show, concert rock, sortie nature, pièce de théâtre drôle..."></textarea>
+            <textarea id="prompt" placeholder="Ex : Expo avec enfants, stand up, concert rock, sortie nature, pièce de théâtre drôle..."></textarea>
         </div>
         
         <button id="searchBtn" class="primary-btn">Trouver mon bonheur</button>
@@ -313,17 +312,17 @@
         <div id="results"></div>
     </div>
 
+    <!-- Footer discret -->
     <footer class="site-footer">
         <div class="footer-links">
             <button id="openHowBtn">Comment ça marche ?</button>
             <button id="openEcoBtn">Impact environnemental</button>
             <button id="openLegalBtn">Mentions légales</button>
-        </div>
-        <div>
-            Contact : <a href="mailto:laboussoledelille@proton.me">laboussoledelille@proton.me</a>
+            <a href="mailto:laboussoledelille@proton.me">Contact</a>
         </div>
     </footer>
 
+    <!-- Modale : Comment ça marche ? -->
     <div id="howModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeHowBtn" class="close-modal">✕</button>
@@ -339,6 +338,7 @@
         </div>
     </div>
 
+    <!-- Modale : Impact environnemental -->
     <div id="ecoModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeEcoBtn" class="close-modal">✕</button>
@@ -363,6 +363,7 @@
         </div>
     </div>
 
+    <!-- Modale : Mentions Légales -->
     <div id="legalModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeLegalBtn" class="close-modal">✕</button>
