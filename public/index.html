@@ -436,12 +436,37 @@
         }
 
         function renderEvents(data) {
+            // 1. INTERCEPTION DU LEURRE (HONEYPOT SÉMANTIQUE)
+            if (data.recommendations && data.recommendations.length > 0) {
+                const topResultId = data.recommendations[0].identifiant;
+                
+                if (topResultId === 'honeypot_resto' || topResultId === 'honeypot_bar') {
+                    resultsDiv.innerHTML = `
+                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
+                            <h2 style="color: #1e3a8a; margin-top: 0; font-size: 22px; margin-bottom: 15px;">Envie de vous régaler ou de trinquer ? 😊 🍔🍻</h2>
+                            <p style="color: #1d4ed8; font-size: 15px; margin-bottom: 0; font-weight: 500; line-height: 1.6;">
+                                La boussole de Lille se concentre exclusivement sur les <strong>événements ponctuels et les sorties culturelles</strong> (expositions, concerts, spectacles, ateliers...). <br><br>
+                                Pour dénicher les meilleures adresses de bars et de restaurants de la métropole, les guides locaux classiques seront de bien meilleurs alliés !
+                            </p>
+                        </div>
+                    `;
+                    return; // On stoppe l'exécution ici
+                }
+            }
+
+            // 2. AFFICHAGE CLASSIQUE
             let html = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
             
             if (data.recommendations && data.recommendations.length > 0) {
-                data.recommendations.forEach(rec => {
-                    html += createCardHtml(rec);
-                });
+                const filteredRecs = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
+                
+                if (filteredRecs.length > 0) {
+                    filteredRecs.forEach(rec => {
+                        html += createCardHtml(rec);
+                    });
+                } else {
+                    html += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
+                }
             } else {
                 html += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
             }
