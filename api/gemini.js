@@ -3,7 +3,7 @@
  *
  * 1. Récupère les dates strictes envoyées par le frontend.
  * 2. Génère un embedding Gemini à partir du prompt.
- * 3. Exécute une requête SQL hybride (chevauchement dates + similarité cosinus).
+ * 3. Exécute une requête SQL hybride (chevauchement dates + similarité cosinus avec seuil).
  * 4. Stream les résultats au client.
  */
 
@@ -96,6 +96,7 @@ module.exports = async (req, res) => {
     
     const embeddingResult = await embeddingModel.embedContent({
       content: { parts: [{ text: prompt }] },
+      taskType: 'RETRIEVAL_QUERY', // Indique que c'est la question de l'utilisateur
       outputDimensionality: 768
     });
 
@@ -128,17 +129,19 @@ module.exports = async (req, res) => {
 
     if (vectorString) {
       if (startOfDay && endOfDay) {
-        // Recherche avec un filtre strict de date ET un tri par pertinence sémantique
+        // Recherche avec un filtre strict de date ET un filtre par pertinence sémantique (<= 0.4)
         dbEvents = await prisma.$queryRaw`
           SELECT 
             e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
             e.longdescription_fr as "longDescriptionFr", e.conditions_fr as "conditionsFr", 
             e.image, e.daterange_fr as "dateRangeFr", e.timings, e.canonicalurl as "canonicalUrl",
-            l.location_name as "locationName", l.location_district as "locationDistrict"
+            l.location_name as "locationName", l.location_district as "locationDistrict",
+            (e.embedding <=> ${vectorString}::vector) as "distance"
           FROM events e
           LEFT JOIN locations l ON e.location_uid = l.location_uid
           WHERE 
             e.embedding IS NOT NULL
+            AND (e.embedding <=> ${vectorString}::vector) <= 0.4
             AND e.timings IS NOT NULL 
             AND EXISTS (
               SELECT 1 
@@ -146,22 +149,23 @@ module.exports = async (req, res) => {
               WHERE (t.timing->>'begin')::timestamp <= ${endOfDay}::timestamp
                 AND (t.timing->>'end')::timestamp >= ${startOfDay}::timestamp
             )
-          ORDER BY e.embedding <=> ${vectorString}::vector
-          LIMIT 50;
+          ORDER BY "distance" ASC;
         `;
       } else {
-        // Recherche sur le catalogue complet (sans dates sélectionnées)
+        // Recherche sur le catalogue complet avec filtre de distance <= 0.4
         dbEvents = await prisma.$queryRaw`
           SELECT 
             e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr", 
             e.longdescription_fr as "longDescriptionFr", e.conditions_fr as "conditionsFr", 
             e.image, e.daterange_fr as "dateRangeFr", e.timings, e.canonicalurl as "canonicalUrl",
-            l.location_name as "locationName", l.location_district as "locationDistrict"
+            l.location_name as "locationName", l.location_district as "locationDistrict",
+            (e.embedding <=> ${vectorString}::vector) as "distance"
           FROM events e
           LEFT JOIN locations l ON e.location_uid = l.location_uid
-          WHERE e.embedding IS NOT NULL
-          ORDER BY e.embedding <=> ${vectorString}::vector
-          LIMIT 50;
+          WHERE 
+            e.embedding IS NOT NULL
+            AND (e.embedding <=> ${vectorString}::vector) <= 0.4
+          ORDER BY "distance" ASC;
         `;
       }
     }
@@ -175,7 +179,9 @@ module.exports = async (req, res) => {
         lieu: e.locationName ? `${e.locationName} ${e.locationDistrict ? `(${e.locationDistrict})` : ''}` : 'Lille',
         date_horaire: e.dateRangeFr || e.daterange_fr,
         tarif: e.conditionsFr || e.conditions_fr || 'Non précisé',
-        url_reservation: e.canonicalUrl || e.canonicalurl
+        url_reservation: e.canonicalUrl || e.canonicalurl,
+        // On récupère la distance brute pour le debug
+        distance_debug: e.distance 
       }));
     }
 
@@ -191,19 +197,17 @@ module.exports = async (req, res) => {
   // ============================================================================
   try {
     let parsedResult;
-    let extraEvents = [];
 
     if (fallbackRecommendations.length > 0) {
       parsedResult = {
         message_intro: startOfDay 
           ? "Voici les événements sur le créneau choisi, triés par pertinence :" 
           : "Voici les événements pertinents, triés pour vous :",
-        recommendations: fallbackRecommendations.slice(0, 5)
+        recommendations: fallbackRecommendations
       };
-      extraEvents = fallbackRecommendations.slice(5);
     } else {
       parsedResult = {
-        message_intro: "Désolé, nous n'avons trouvé aucun événement dans le créneau souhaité.",
+        message_intro: "Aucun événement ne correspond exactement à cette recherche.",
         recommendations: []
       };
     }
@@ -212,7 +216,6 @@ module.exports = async (req, res) => {
       type: 'result', 
       data: { 
         result: parsedResult, 
-        extra_events: extraEvents, 
         raw: { source: 'direct_db' } 
       } 
     });

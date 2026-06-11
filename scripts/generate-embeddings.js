@@ -406,6 +406,7 @@ Analyse 'daterange_texte' et 'date_debut_reference' pour scinder la temporalité
           console.log(`  [DEBUG] Texte sémantique envoyé à l'embedding (ID: ${eventId}) : "${parsedData.condensed_text}"`);
           const embedResult = await callAIWithRetry(() => embedModel.embedContent({
             content: { parts: [{ text: parsedData.condensed_text }] },
+            taskType: 'RETRIEVAL_DOCUMENT', // Indique que c'est une donnée à stocker pour être cherchée plus tard
             outputDimensionality: 768
           }));
 

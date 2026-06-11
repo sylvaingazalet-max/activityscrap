@@ -312,7 +312,6 @@
         <div id="results"></div>
     </div>
 
-    <!-- Footer discret -->
     <footer class="site-footer">
         <div class="footer-links">
             <button id="openHowBtn">Comment ça marche ?</button>
@@ -322,7 +321,6 @@
         </div>
     </footer>
 
-    <!-- Modale : Comment ça marche ? -->
     <div id="howModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeHowBtn" class="close-modal">✕</button>
@@ -338,7 +336,6 @@
         </div>
     </div>
 
-    <!-- Modale : Impact environnemental -->
     <div id="ecoModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeEcoBtn" class="close-modal">✕</button>
@@ -363,7 +360,6 @@
         </div>
     </div>
 
-    <!-- Modale : Mentions Légales -->
     <div id="legalModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeLegalBtn" class="close-modal">✕</button>
@@ -423,6 +419,7 @@
             const imageHtml = rec.image_url 
                 ? `<img src="${rec.image_url}" alt="${rec.titre}" class="event-image">` 
                 : '';
+
             return `
                 <div class="event-card">
                     ${imageHtml}
@@ -438,7 +435,7 @@
             `;
         }
 
-        function renderEvents(data, extraEvents = []) {
+        function renderEvents(data) {
             let html = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
             
             if (data.recommendations && data.recommendations.length > 0) {
@@ -449,30 +446,7 @@
                 html += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
             }
 
-            if (extraEvents && extraEvents.length > 0) {
-                html += `<div id="extraEventsContainer" style="display: none; margin-top: 25px;">`;
-                extraEvents.forEach(rec => {
-                    html += createCardHtml(rec);
-                });
-                html += `</div>`;
-                html += `<button id="toggleExtraBtn" style="margin-top: 10px; background: #e5e7eb; color: var(--text-main); padding: 12px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; width: 100%; font-weight: 600; transition: background 0.2s;">Voir plus d'événements (${extraEvents.length})</button>`;
-            }
-
             resultsDiv.innerHTML = html;
-
-            const toggleBtn = document.getElementById('toggleExtraBtn');
-            if (toggleBtn) {
-                toggleBtn.onclick = () => {
-                    const container = document.getElementById('extraEventsContainer');
-                    if (container.style.display === 'none') {
-                        container.style.display = 'block';
-                        toggleBtn.textContent = "Voir moins d'événements";
-                    } else {
-                        container.style.display = 'none';
-                        toggleBtn.textContent = `Voir plus d'événements (${extraEvents.length})`;
-                    }
-                };
-            }
         }
 
         searchBtn.onclick = async () => {
@@ -528,7 +502,7 @@
                                 } else if (event.type === 'result') {
                                     statusDiv.textContent = '';
                                     resultsDiv.style.display = 'block';
-                                    renderEvents(event.data.result, event.data.extra_events);
+                                    renderEvents(event.data.result);
                                 } else if (event.type === 'error') {
                                     statusDiv.textContent = '❌ Erreur : ' + event.data.error;
                                 }
