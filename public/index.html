@@ -73,7 +73,6 @@
             font-size: 15px;
         }
 
-        /* Styles des onglets pour la date */
         .segmented-control {
             display: flex;
             background: #f3f4f6;
@@ -157,7 +156,6 @@
             cursor: not-allowed;
         }
 
-        /* Style du bouton "Voir plus" */
         button.secondary-btn {
             display: block;
             width: 100%;
@@ -263,7 +261,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Styles pour le footer et les modales */
         .site-footer {
             margin-top: 25px;
             text-align: center;
@@ -369,7 +366,7 @@
 
         <div class="section">
             <label for="prompt">De quoi avez-vous envie ?</label>
-            <textarea id="prompt" placeholder="Ex : Sortie nature avec enfants, concert qui bouge, expo étrange en intérieur, sortie nature, pièce de théâtre drôle..."></textarea>
+            <textarea id="prompt" placeholder="Ex : Sortie nature avec enfants, concert qui bouge, expo étrange en intérieur, pièce de théâtre drôle..."></textarea>
         </div>
         
         <button id="searchBtn" class="primary-btn">C'est parti!</button>
@@ -379,8 +376,8 @@
 
     <footer class="site-footer">
         <div class="footer-links">
-            <button id="openHowBtn">Comment ça marche ?</button>
-            <button id="openEcoBtn">Impact environnemental</button>
+            <button id="openHowBtn">Pourquoi nous ?</button>
+            <button id="openEcoBtn">Logique & Impact</button>
             <button id="openLegalBtn">Mentions légales</button>
             <a href="mailto:laboussoledelille@proton.me">Contact</a>
         </div>
@@ -389,14 +386,17 @@
     <div id="howModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeHowBtn" class="close-modal">✕</button>
-            <h2>Comment ça marche ?</h2>
-            <p><strong>La recherche vectorielle</strong></p>
+            <h2>Pourquoi La Boussole ?</h2>
+            
+            <h3>Mieux qu'un LLM classique (ex: ChatGPT)</h3>
+            <p>Une IA conversationnelle est subjective : elle fait des choix à votre place, propose souvent les mêmes lieux mainstream, et hallucine parfois les horaires. <strong>Ici, l'IA ne prend aucune décision.</strong> Elle fait de la pure analyse sémantique : elle convertit votre envie en coordonnées mathématiques et trouve les événements locaux qui en sont factuellement les plus proches. Zéro filtre, 100% de pertinence.</p>
+
+            <h3>Une base de données hyper-exhaustive</h3>
+            <p>Nous aspirons et agrégeons en continu les données d'une multitude de sources pour ne rien rater, du grand festival au petit atelier de quartier :</p>
             <ul>
-                <li><strong>Collecte :</strong> Nous récupérons automatiquement les événements lillois depuis OpenAgenda et Ticketmaster.</li>
-                <li><strong>Synthèse :</strong> Une IA ultra-légère (Gemini Flash Lite) génère un résumé très court de chaque événement.</li>
-                <li><strong>Vectorisation :</strong> Ce résumé est transformé en coordonnées mathématiques (un "vecteur").</li>
-                <li><strong>Recherche :</strong> Votre requête est elle aussi convertie en coordonnées.</li>
-                <li><strong>Résultat :</strong> Une simple requête en base de données trouve instantanément les événements dont les coordonnées sont les plus proches de votre envie.</li>
+                <li><strong>OpenAgenda :</strong> Incluant les données officielles de la Mairie de Lille et des dizaines de petits agendas associatifs locaux.</li>
+                <li><strong>DataTourisme :</strong> La base de données nationale des offices de tourisme.</li>
+                <li><strong>Ticketmaster & Eventbrite :</strong> Pour ne rater aucun concert, spectacle ou atelier indépendant.</li>
             </ul>
         </div>
     </div>
@@ -404,23 +404,17 @@
     <div id="ecoModal" class="modal-overlay">
         <div class="modal-content">
             <button id="closeEcoBtn" class="close-modal">✕</button>
-            <h2>Notre impact environnemental</h2>
-            <p>L'IA consomme de l'énergie. Voici l'empreinte carbone brute de notre moteur, en toute transparence et hors compensation des fournisseurs cloud :</p>
+            <h2>La voie logique et écolo</h2>
+            <p>L'IA consomme de l'énergie. L'utiliser pour générer des blocs de texte à chaque recherche (comme un chatbot) est un non-sens écologique. Notre parti pris est <strong>direct et minimaliste</strong>.</p>
             
-            <h3>L'impact à l'unité</h3>
+            <h3>L'astuce de la "Vectorisation Unique"</h3>
             <ul>
-                <li><strong>1 événement intégré</strong> (collecte, résumé par Gemini Flash Lite et vectorisation) : 0,1 à 0,2 g de CO2.</li>
-                <li><strong>1 recherche utilisateur</strong> (vectorisation de la requête et comparaison en base) : 0,01 à 0,05 g de CO2.</li>
-            </ul>
-
-            <h3>Le bilan à grande échelle</h3>
-            <ul>
-                <li><strong>1000 événements intégrés</strong> : 100 à 200 g de CO2.</li>
-                <li><strong>1000 recherches</strong> : 10 à 50 g de CO2.</li>
+                <li><strong>Une seule fois pour l'événement :</strong> Lorsqu'un événement est détecté, l'IA l'analyse <em>une seule fois pour toute sa durée de vie</em> et le transforme en coordonnées (vecteur). Impact : 0,1 à 0,2 g de CO2.</li>
+                <li><strong>Un calcul basique à la recherche :</strong> Quand vous tapez votre envie, on la vectorise en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste est un simple calcul de distance en base de données PostgreSQL.</li>
             </ul>
 
             <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                <p style="margin: 0; color: var(--text-main);"><strong>Pour comparer :</strong> Cumuler l'intégration de 1000 événements et 1000 recherches génère la même empreinte carbone que de laisser une ampoule LED allumée pendant deux semaines. Un impact réel, mais strictement minimisé grâce au choix d'un modèle d'IA "Lite" ultra-optimisé.</p>
+                <p style="margin: 0; color: var(--text-main);"><strong>En résumé :</strong> La Boussole utilise l'IA uniquement pour comprendre le sens des mots, pas pour bavarder. Ce choix technique (modèle Gemini Flash Lite + PostgreSQL pgvector) permet d'avoir la puissance de l'IA avec une empreinte carbone drastiquement réduite.</p>
             </div>
         </div>
     </div>
@@ -431,7 +425,7 @@
             <h2>Mentions légales</h2>
             
             <h3>Éditeur du site</h3>
-            <p>Ce site est édité à titre personnel. L'éditeur a fait le choix de garder l'anonymat. Conformément à la loi pour la confiance dans l'économie numérique (LCEN), ses coordonnées exactes ont été transmises à l'hébergeur.</p>
+            <p>Ce site est édité à titre personnel par Sylvain Gazalet.</p>
 
             <h3>Hébergement</h3>
             <p>Ce site est hébergé par Vercel Inc.<br>
@@ -545,12 +539,10 @@
         }
 
         function renderEvents(data) {
-            // Réinitialisation de l'état
             allRecommendations = [];
             visibleCount = 0;
             resultsDiv.innerHTML = '';
 
-            // Gestion des honeypots (Resto / Bar)
             if (data.recommendations && data.recommendations.length > 0) {
                 const topResultId = data.recommendations[0].identifiant;
                 if (topResultId === 'honeypot_resto' || topResultId === 'honeypot_bar') {
@@ -565,21 +557,17 @@
                     `;
                     return; 
                 }
-                // On filtre les honeypots et on stocke la liste complète
                 allRecommendations = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
             }
 
-            // Message d'introduction
             const introHtml = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
             
-            // Création d'un conteneur spécifique pour les cartes
             const cardsContainer = document.createElement('div');
             cardsContainer.id = 'cards-container';
             
             resultsDiv.innerHTML = introHtml;
             resultsDiv.appendChild(cardsContainer);
 
-            // Si on a des recommandations, on affiche la première "fournée"
             if (allRecommendations.length > 0) {
                 renderNextBatch();
             } else {
@@ -587,7 +575,6 @@
             }
         }
 
-        // Fonction qui injecte le lot suivant de cartes
         function renderNextBatch() {
             const cardsContainer = document.getElementById('cards-container');
             const nextBatch = allRecommendations.slice(visibleCount, visibleCount + BATCH_SIZE);
@@ -597,15 +584,12 @@
                 batchHtml += createCardHtml(rec);
             });
             
-            // Ajoute les nouvelles cartes sans écraser les précédentes
             cardsContainer.insertAdjacentHTML('beforeend', batchHtml);
             visibleCount += nextBatch.length;
             
-            // Gestion de l'affichage du bouton "Voir plus"
             let loadMoreBtn = document.getElementById('loadMoreBtn');
             
             if (visibleCount < allRecommendations.length) {
-                // S'il reste des éléments et que le bouton n'existe pas, on le crée
                 if (!loadMoreBtn) {
                     loadMoreBtn = document.createElement('button');
                     loadMoreBtn.id = 'loadMoreBtn';
@@ -615,7 +599,6 @@
                     resultsDiv.appendChild(loadMoreBtn);
                 }
             } else {
-                // S'il ne reste plus d'éléments, on supprime le bouton
                 if (loadMoreBtn) {
                     loadMoreBtn.remove();
                 }
@@ -629,16 +612,14 @@
             let startDate = "";
             let endDate = "";
             
-            // On extrait les dates selon l'onglet actif
             if (currentMode === 'single') {
                 if (fpSingle.selectedDates.length > 0) {
                     startDate = flatpickr.formatDate(fpSingle.selectedDates[0], "Y-m-d");
-                    endDate = startDate; // Pour un jour unique, début = fin
+                    endDate = startDate; 
                 }
             } else if (currentMode === 'range') {
                 if (fpRange.selectedDates.length > 0) {
                     startDate = flatpickr.formatDate(fpRange.selectedDates[0], "Y-m-d");
-                    // Si l'utilisateur n'a cliqué qu'une fois dans le range, on sécurise :
                     endDate = fpRange.selectedDates[1] 
                         ? flatpickr.formatDate(fpRange.selectedDates[1], "Y-m-d") 
                         : startDate;
@@ -657,7 +638,6 @@
                     body: JSON.stringify({ prompt, startDate, endDate })
                 });
 
-                // DÉTECTION DE L'ERREUR ANTI-BOT (401 ou 403)
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         throw new Error("EXPIRED_SESSION");
@@ -701,7 +681,6 @@
                     }
                 }
             } catch (err) {
-                // GESTION SPÉCIFIQUE DU MESSAGE D'ERREUR
                 if (err.message === "EXPIRED_SESSION") {
                     statusDiv.innerHTML = `
                         <div style="color: #b45309; background: #fef3c7; padding: 15px; border-radius: 8px; border: 1px solid #fde68a;">

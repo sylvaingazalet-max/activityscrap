@@ -1,0 +1,49 @@
+========================================================================
+MODE OPÉRATOIRE : MOISSONNAGE EVENTBRITE "SNIPER"
+========================================================================
+
+--- ÉTAPE 1 : LA COLLECTE MANUELLE (LE NAVIGATEUR) ---
+1. Ouvre ton navigateur (Chrome/Edge/Firefox) et va sur : 
+   https://www.eventbrite.fr/d/france--lille/all-events/
+   (Tu peux aussi affiner la recherche sur le site, l'important est d'avoir une liste d'événements à l'écran).
+2. Scrolle tout en bas et clique sur "Suivant" autant de fois que nécessaire pour charger un maximum d'événements sur la page.
+3. Fais un clic droit n'importe où > "Inspecter" (ou appuie sur F12).
+4. Va dans l'onglet "Console".
+5. Copie-colle le script exact ci-dessous et appuie sur "Entrée" :
+
+// --- DÉBUT DU SCRIPT À COPIER ---
+const allLinks = Array.from(document.querySelectorAll('a[href]'));
+const eventUrls = allLinks
+  .map(a => a.href)
+  .filter(href => href.includes('/e/') && href.match(/-\d+(\?|$)/))
+  .map(href => href.split('?')[0]);
+const uniqueUrls = [...new Set(eventUrls)];
+console.log(`🎉 ${uniqueUrls.length} événements trouvés ! Voici le tableau :`);
+console.log(JSON.stringify(uniqueUrls, null, 2));
+// --- FIN DU SCRIPT À COPIER ---
+
+6. La console va afficher un grand tableau JSON (ex: [ "https://...", "https://..." ]). Copie ce tableau en entier.
+
+
+--- ÉTAPE 2 : LE SAUVETAGE ---
+1. Ouvre le fichier : scripts/eventbrite/raw_events.json
+2. Remplace tout son contenu en y collant le tableau JSON que tu viens de copier.
+3. Sauvegarde le fichier.
+
+
+--- ÉTAPE 3 : L'EXTRACTION DES ORGANISATEURS ---
+1. Ouvre ton terminal à la racine de ton projet.
+2. Lance la commande suivante : 
+   node ./scripts/eventbrite/1_extractOrganizers.js
+3. Le script va lire tes URLs, trouver les organisateurs correspondants via l'API, et les ajouter proprement à ton fichier `eventbrite.json` sans créer de doublons.
+4. (Optionnel) Une fois terminé, tu peux vider `raw_events.json` en y mettant juste des crochets vides : []
+
+
+--- ÉTAPE 4 : LA SYNCHRONISATION EN BDD ---
+1. Toujours depuis la racine de ton projet, lance la commande finale :
+   node ./scripts/eventbrite/2_syncEventbrite.js
+2. Le script va parcourir tous les VIP de ton annuaire `eventbrite.json`, aspirer tous leurs événements actuels, recréer les lieux si besoin, et tout injecter dans ta base PostgreSQL via Prisma.
+
+========================================================================
+🎉 FIN DE LA PROCÉDURE !
+========================================================================

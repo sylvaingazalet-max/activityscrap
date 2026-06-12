@@ -1,0 +1,81 @@
+1) Aller sur https://www.eventbrite.fr/d/france--lille/all-events/
+
+2) Executer le script : 
+
+// On récupère tous les liens de la page
+const allLinks = Array.from(document.querySelectorAll('a[href]'));
+
+// On filtre pour ne garder que les vrais liens d'événements Eventbrite
+const eventUrls = allLinks
+  .map(a => a.href)
+  .filter(href => href.includes('/e/') && href.match(/-\d+(\?|$)/)) // Garde ceux avec un ID numérique à la fin
+  .map(href => href.split('?')[0]); // Nettoie les paramètres de tracking (?aff=...)
+
+// On supprime les doublons (Eventbrite met souvent 2 fois le même lien : sur l'image et sur le titre)
+const uniqueUrls = [...new Set(eventUrls)];
+
+// On affiche le résultat prêt à être copié dans ton script Node.js !
+console.log(`🎉 ${uniqueUrls.length} événements trouvés ! Voici le tableau :`);
+console.log(JSON.stringify(uniqueUrls, null, 2));
+
+3) demander à gemini de faire un grand fichier à partir des résultats et remplir eventbrite.json
+
+[
+  {
+    "id": "78340228613",
+    "name": "Lespace Comedie",
+    "url": "https://www.eventbrite.fr/o/lespace-comedie-78340228613"
+  },
+  {
+    "id": "74793232233",
+    "name": "Flupa Lille",
+    "url": "https://www.eventbrite.fr/o/flupa-lille-74793232233"
+  },
+  {
+    "id": "43764692283",
+    "name": "SSB Sport",
+    "url": "https://www.eventbrite.fr/o/ssb-sport-43764692283"
+  },
+  {
+    "id": "17413589794",
+    "name": "Euratechkids Euratechnologies Lille",
+    "url": "https://www.eventbrite.fr/o/euratechkids-euratechnologies-lille-17413589794"
+  },
+  {
+    "id": "14345972743",
+    "name": "Pena Estrella Ecole De Danse Flamenco Lille",
+    "url": "https://www.eventbrite.fr/o/pena-estrella-ecole-de-danse-flamenco-lille-14345972743"
+  },
+  {
+    "id": "15606909947",
+    "name": "Reech",
+    "url": "https://www.eventbrite.fr/o/reech-15606909947"
+  },
+  {
+    "id": "46615398513",
+    "name": "Eurometropolis Lille Kortrijk Tournai",
+    "url": "https://www.eventbrite.fr/o/eurometropolis-lille-kortrijk-tournai-46615398513"
+  },
+  {
+    "id": "26763158833",
+    "name": "Inspe Institut National Superieur Du Professorat Et De Leducation",
+    "url": "https://www.eventbrite.fr/o/inspe-institut-national-superieur-du-professorat-et-de-leducation-26763158833"
+  },
+  {
+    "id": "30104863158",
+    "name": "La 8eme Semaine La Medit Des Parents Mbsr Lille",
+    "url": "https://www.eventbrite.fr/o/la-8eme-semaine-la-medit-des-parents-mbsr-lille-30104863158"
+  },
+  {
+    "id": "33505227247",
+    "name": "Laffranchie Librairie",
+    "url": "https://www.eventbrite.fr/o/laffranchie-librairie-33505227247"
+  },
+  {
+    "id": "3102003080",
+    "name": "La Tele De Lilou",
+    "url": "https://www.eventbrite.fr/o/la-tele-de-lilou-3102003080"
+  }
+
+  
+]
