@@ -13,8 +13,21 @@ if (allowInsecureTls) {
 }
 
 // Liste des mots-clés pour la recherche
-const keywords = ['lille', 'roubaix', 'tourcoing', "villeneuve d'ascq", 'mel'];
-
+const keywords = [
+  // Cœur de la MEL
+  'lille', 'roubaix', 'tourcoing', "villeneuve d'ascq", 'mel',
+  
+  // Villes majeures de la métropole
+  'marcq-en-baroeul', 'wattrelos', 'armentieres', 'lambersart', 'loos',
+  'croix', 'wasquehal', 'roncq', 'hem', 'faches-thumesnil', 'seclin',
+  'haubourdin', 'comines', 'halluin', 'lesquin', 'ronchin', 'bondues',
+  
+  // Appellations territoriales
+  'metropole lilloise', 
+    
+  // Pôles d'attraction / Campus
+  'universite de lille', 'euratechnologies', 'plaine images'
+];
 async function fetchAgendas() {
   // Utilisation d'une Map pour dé-doublonner facilement grâce à l'UID
   const uniqueAgendas = new Map();

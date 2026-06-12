@@ -159,3 +159,52 @@ model Location {
 
   @@map("locations")
 }
+
+model PointOfInterest {
+  id              String   @id // Peut être "node/123" (OSM) ou "https://data..." (DataTourisme)
+  
+  // Rendus optionnels car DataTourisme ne les possède pas
+  osmId           String?  @map("osm_id")
+  osmType         String?  @map("osm_type") 
+  
+  name            String?
+  category        String?  // Ex: "restaurant", "Chapel", "CulturalSite"
+  cuisine         String?  
+  siret           String?  @map("ref_siret") 
+  
+  coordinates     Json?    
+  
+  // Données d'adresse
+  street          String?  @map("address_street")
+  housenumber     String?  @map("address_housenumber")
+  postcode        String?  @map("address_postcode")
+  city            String?  @map("address_city")
+  
+  // Contacts et Liens
+  phone           String?
+  website         String?
+  facebook        String?
+  
+  // Informations Pratiques (Surtout OSM)
+  openingHours    String?  @map("opening_hours")
+  wheelchair      String?  
+  indoorSeating   String?  @map("indoor_seating")
+  outdoorSeating  String?  @map("outdoor_seating")
+  vegetarian      String?  @map("diet_vegetarian")
+  
+  // --- NOUVEAUTÉS POUR DATATOURISME ---
+  description     String?  // Description fournie par l'Office de Tourisme
+  source          String?  // Obligation légale (hasBeenCreatedBy)
+  image           String?  // URL de l'image principale
+
+  // --- IA / VECTEURS ---
+  summary         String?  // Le chapo généré pour ton frontend
+  embedding       Unsupported("vector")?
+
+  rawTags         Json?    @map("raw_tags")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("points_of_interest")
+}

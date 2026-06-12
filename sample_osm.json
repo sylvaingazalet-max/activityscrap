@@ -1,0 +1,157 @@
+[
+  {
+    "type": "node",
+    "id": 527186674,
+    "lat": 50.6346408,
+    "lon": 3.0402339,
+    "tags": {
+      "amenity": "restaurant",
+      "contact:facebook": "Lescalerestaurantlille",
+      "cuisine": "regional;french",
+      "name": "L'escale",
+      "ref:FR:SIRET": "82521353100015",
+      "source": "survey",
+      "website": "https://lescale59.eatbu.com"
+    }
+  },
+  {
+    "type": "node",
+    "id": 585221183,
+    "lat": 50.637047,
+    "lon": 3.0622839,
+    "tags": {
+      "amenity": "cafe",
+      "check_date": "2023-05-27",
+      "contact:city": "Lille",
+      "contact:housenumber": "12",
+      "contact:postcode": "59000",
+      "contact:street": "Rue Nationale",
+      "diet:vegetarian": "yes",
+      "indoor_seating": "yes",
+      "name": "Le Voltaire",
+      "outdoor_seating": "yes",
+      "payment:mastercard": "yes",
+      "payment:visa": "yes",
+      "ref:FR:SIRET": "47350203700012",
+      "wheelchair": "limited"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617240499,
+    "lat": 50.6383299,
+    "lon": 3.0684087,
+    "tags": {
+      "amenity": "restaurant",
+      "contact:city": "Lille",
+      "contact:housenumber": "23",
+      "contact:phone": "+33 3 20 06 31 48",
+      "contact:postcode": "59000",
+      "contact:street": "Rue de Roubaix",
+      "cuisine": "italian",
+      "name": "Pinocchio",
+      "opening_hours": "Tu-Th 12:00-14:00,19:00-22:00; Fr 12:00-14:00,19:00-22:30; Sa 19:00-23:00"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617240501,
+    "lat": 50.6375664,
+    "lon": 3.0675295,
+    "tags": {
+      "amenity": "restaurant",
+      "contact:housenumber": "2",
+      "contact:street": "Rue de Roubaix",
+      "cuisine": "french",
+      "indoor_seating": "yes",
+      "name": "L'Opera Corner",
+      "opening_hours": "Mo-Sa 09:00-16:00,19:00-22:30",
+      "outdoor_seating": "yes",
+      "phone": "+33 3 20 55 98 23",
+      "ref:FR:SIRET": "92832505900022"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617240502,
+    "lat": 50.6380195,
+    "lon": 3.0666219,
+    "tags": {
+      "amenity": "bar",
+      "contact:facebook": "https://www.facebook.com/amulsolorootsbar",
+      "contact:housenumber": "9",
+      "contact:phone": "+33 3 20 74 44 90",
+      "contact:street": "Rue des Arts",
+      "live_music": "yes",
+      "name": "Amul solo",
+      "opening_hours": "Tu-Sa 18:30-02:00",
+      "ref:FR:SIRET": "42888521400018"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617240503,
+    "lat": 50.6381356,
+    "lon": 3.0664352,
+    "tags": {
+      "amenity": "restaurant",
+      "cuisine": "kebab",
+      "name": "Le Royal"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617240504,
+    "lat": 50.6393838,
+    "lon": 3.0649427,
+    "tags": {
+      "amenity": "cafe",
+      "check_date": "2026-05-08",
+      "name": "Au Point Central",
+      "outdoor_seating": "yes",
+      "source": "survey"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617240509,
+    "lat": 50.6396164,
+    "lon": 3.0617223,
+    "tags": {
+      "amenity": "cafe",
+      "name": "Parvis Treille",
+      "ref:FR:SIRET": "90455440900014"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617639561,
+    "lat": 50.6407517,
+    "lon": 3.0613787,
+    "tags": {
+      "amenity": "restaurant",
+      "contact:phone": "+33320063998",
+      "contact:website": "https://www.la-bottega.com/in-bocca-al-lupo.php",
+      "cuisine": "italian",
+      "name": "Restaurant In Bocca Lupo",
+      "opening_hours": "Su-Fr 12:00-14:00,19:00-22:00; Sa 12:00-14:30,19:00-22:30",
+      "ref:FR:SIRET": "41038600700059"
+    }
+  },
+  {
+    "type": "node",
+    "id": 617639563,
+    "lat": 50.6408939,
+    "lon": 3.061407,
+    "tags": {
+      "amenity": "restaurant",
+      "check_date": "2023-09-20",
+      "contact:phone": "+33 3 20 13 81 64",
+      "contact:website": "https://estaminetlille.fr/nos-estaminets/estaminet-au-vieux-de-la-vieille",
+      "cuisine": "regional",
+      "name": "Au Vieux de la Vieille",
+      "opening_hours": "Mo-Fr 12:00-14:00,19:00-22:30; Sa-Su 12:00-14:00,19:00-23:00",
+      "ref:FR:SIRET": "49751149300015"
+    }
+  }
+]

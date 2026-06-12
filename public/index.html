@@ -73,6 +73,36 @@
             font-size: 15px;
         }
 
+        /* Styles des onglets pour la date */
+        .segmented-control {
+            display: flex;
+            background: #f3f4f6;
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .segmented-control button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .segmented-control button.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
         input[type="text"], textarea {
             width: 100%;
             padding: 14px 16px;
@@ -125,6 +155,28 @@
             background: #d1d5db;
             box-shadow: none;
             cursor: not-allowed;
+        }
+
+        /* Style du bouton "Voir plus" */
+        button.secondary-btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: #ffffff;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+
+        button.secondary-btn:hover {
+            background: var(--primary);
+            color: #ffffff;
         }
 
         #status {
@@ -298,16 +350,29 @@
         <h1>🧭 <span>La boussole de Lille</span></h1>
         
         <div class="section">
-            <label for="dateRange">Quand voulez-vous sortir ? (facultatif)</label>
-            <input type="text" id="dateRange" placeholder="Sélectionnez une ou plusieurs dates...">
+            <label>Quand voulez-vous sortir ?</label>
+            
+            <div class="segmented-control" id="date-tabs">
+                <button class="active" data-mode="any">Peu importe</button>
+                <button data-mode="single">Un jour précis</button>
+                <button data-mode="range">Une période</button>
+            </div>
+
+            <div id="date-single-container" class="hidden">
+                <input type="text" id="dateSingle" placeholder="Sélectionnez une date...">
+            </div>
+
+            <div id="date-range-container" class="hidden">
+                <input type="text" id="dateRange" placeholder="Sélectionnez vos dates...">
+            </div>
         </div>
 
         <div class="section">
             <label for="prompt">De quoi avez-vous envie ?</label>
-            <textarea id="prompt" placeholder="Ex : Expo avec enfants, stand up, concert rock, sortie nature, pièce de théâtre drôle..."></textarea>
+            <textarea id="prompt" placeholder="Ex : Sortie nature avec enfants, concert qui bouge, expo étrange en intérieur, sortie nature, pièce de théâtre drôle..."></textarea>
         </div>
         
-        <button id="searchBtn" class="primary-btn">Trouver mon bonheur</button>
+        <button id="searchBtn" class="primary-btn">C'est parti!</button>
         <div id="status"></div>
         <div id="results"></div>
     </div>
@@ -380,7 +445,7 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
     <script>
-        // --- Gestion des modales (Légales, Fonctionnement, Écologie) ---
+        // --- Gestion des modales ---
         function setupModal(modalId, openBtnId, closeBtnId) {
             const modal = document.getElementById(modalId);
             document.getElementById(openBtnId).onclick = () => modal.style.display = 'flex';
@@ -394,26 +459,70 @@
             setupModal('ecoModal', 'openEcoBtn', 'closeEcoBtn')
         ];
 
-        // Fermer les modales si on clique en dehors du contenu
         window.onclick = (e) => {
             modals.forEach(modal => {
                 if (e.target === modal) modal.style.display = 'none';
             });
         }
 
-        // --- Logique principale de l'application ---
-        const datePicker = flatpickr("#dateRange", {
-            mode: "range",
+        // --- Logique du formulaire & Calendriers ---
+        
+        let currentMode = 'any'; // Par défaut, "Peu importe"
+        const tabs = document.querySelectorAll('#date-tabs button');
+        const singleContainer = document.getElementById('date-single-container');
+        const rangeContainer = document.getElementById('date-range-container');
+
+        // Configuration de base Flatpickr
+        const fpConfig = {
             locale: "fr",
             minDate: "today",
             dateFormat: "Y-m-d",
             altInput: true,
             altFormat: "j F Y",
+        };
+
+        // Initialisation pour "Un jour précis"
+        const fpSingle = flatpickr("#dateSingle", fpConfig);
+
+        // Initialisation pour "Une période"
+        const fpRange = flatpickr("#dateRange", {
+            ...fpConfig,
+            mode: "range"
         });
 
+        // Gestion du clic sur les onglets
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Maj de l'UI des onglets
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                currentMode = tab.dataset.mode;
+
+                // Affichage conditionnel des calendriers
+                if (currentMode === 'any') {
+                    singleContainer.classList.add('hidden');
+                    rangeContainer.classList.add('hidden');
+                } else if (currentMode === 'single') {
+                    singleContainer.classList.remove('hidden');
+                    rangeContainer.classList.add('hidden');
+                } else if (currentMode === 'range') {
+                    singleContainer.classList.add('hidden');
+                    rangeContainer.classList.remove('hidden');
+                }
+            });
+        });
+
+        // --- Logique de recherche ---
+        
         const searchBtn = document.getElementById('searchBtn');
         const resultsDiv = document.getElementById('results');
         const statusDiv = document.getElementById('status');
+
+        // Variables d'état pour la pagination
+        let allRecommendations = [];
+        let visibleCount = 0;
+        const BATCH_SIZE = 3;
 
         function createCardHtml(rec) {
             const imageHtml = rec.image_url 
@@ -436,57 +545,105 @@
         }
 
         function renderEvents(data) {
-            // 1. INTERCEPTION DU LEURRE (HONEYPOT SÉMANTIQUE)
+            // Réinitialisation de l'état
+            allRecommendations = [];
+            visibleCount = 0;
+            resultsDiv.innerHTML = '';
+
+            // Gestion des honeypots (Resto / Bar)
             if (data.recommendations && data.recommendations.length > 0) {
                 const topResultId = data.recommendations[0].identifiant;
-                
                 if (topResultId === 'honeypot_resto' || topResultId === 'honeypot_bar') {
                     resultsDiv.innerHTML = `
                         <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
                             <h2 style="color: #1e3a8a; margin-top: 0; font-size: 22px; margin-bottom: 15px;">Envie de vous régaler ou de trinquer ? 😊 🍔🍻</h2>
                             <p style="color: #1d4ed8; font-size: 15px; margin-bottom: 0; font-weight: 500; line-height: 1.6;">
-                                La boussole de Lille se concentre exclusivement sur les <strong>événements ponctuels et les sorties culturelles</strong> (expositions, concerts, spectacles, ateliers...). <br><br>
-                                Pour dénicher les meilleures adresses de bars et de restaurants de la métropole, les guides locaux classiques seront de bien meilleurs alliés !
+                                La boussole de Lille se concentre exclusivement sur les <strong>événements ponctuels et les sorties culturelles</strong>.<br><br>
+                                Pour dénicher les meilleures adresses, les guides locaux classiques seront de bien meilleurs alliés !
                             </p>
                         </div>
                     `;
-                    return; // On stoppe l'exécution ici
+                    return; 
                 }
+                // On filtre les honeypots et on stocke la liste complète
+                allRecommendations = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
             }
 
-            // 2. AFFICHAGE CLASSIQUE
-            let html = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
+            // Message d'introduction
+            const introHtml = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
             
-            if (data.recommendations && data.recommendations.length > 0) {
-                const filteredRecs = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
-                
-                if (filteredRecs.length > 0) {
-                    filteredRecs.forEach(rec => {
-                        html += createCardHtml(rec);
-                    });
-                } else {
-                    html += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
+            // Création d'un conteneur spécifique pour les cartes
+            const cardsContainer = document.createElement('div');
+            cardsContainer.id = 'cards-container';
+            
+            resultsDiv.innerHTML = introHtml;
+            resultsDiv.appendChild(cardsContainer);
+
+            // Si on a des recommandations, on affiche la première "fournée"
+            if (allRecommendations.length > 0) {
+                renderNextBatch();
+            } else {
+                resultsDiv.innerHTML += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
+            }
+        }
+
+        // Fonction qui injecte le lot suivant de cartes
+        function renderNextBatch() {
+            const cardsContainer = document.getElementById('cards-container');
+            const nextBatch = allRecommendations.slice(visibleCount, visibleCount + BATCH_SIZE);
+            
+            let batchHtml = '';
+            nextBatch.forEach(rec => {
+                batchHtml += createCardHtml(rec);
+            });
+            
+            // Ajoute les nouvelles cartes sans écraser les précédentes
+            cardsContainer.insertAdjacentHTML('beforeend', batchHtml);
+            visibleCount += nextBatch.length;
+            
+            // Gestion de l'affichage du bouton "Voir plus"
+            let loadMoreBtn = document.getElementById('loadMoreBtn');
+            
+            if (visibleCount < allRecommendations.length) {
+                // S'il reste des éléments et que le bouton n'existe pas, on le crée
+                if (!loadMoreBtn) {
+                    loadMoreBtn = document.createElement('button');
+                    loadMoreBtn.id = 'loadMoreBtn';
+                    loadMoreBtn.className = 'secondary-btn';
+                    loadMoreBtn.innerHTML = 'Voir plus de sorties 👇';
+                    loadMoreBtn.onclick = renderNextBatch;
+                    resultsDiv.appendChild(loadMoreBtn);
                 }
             } else {
-                html += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
+                // S'il ne reste plus d'éléments, on supprime le bouton
+                if (loadMoreBtn) {
+                    loadMoreBtn.remove();
+                }
             }
-
-            resultsDiv.innerHTML = html;
         }
 
         searchBtn.onclick = async () => {
             const prompt = document.getElementById('prompt').value.trim();
+            if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
             
-            const selectedDates = datePicker.selectedDates;
             let startDate = "";
             let endDate = "";
             
-            if (selectedDates.length > 0) {
-                startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
-                endDate = selectedDates[1] ? flatpickr.formatDate(selectedDates[1], "Y-m-d") : startDate;
+            // On extrait les dates selon l'onglet actif
+            if (currentMode === 'single') {
+                if (fpSingle.selectedDates.length > 0) {
+                    startDate = flatpickr.formatDate(fpSingle.selectedDates[0], "Y-m-d");
+                    endDate = startDate; // Pour un jour unique, début = fin
+                }
+            } else if (currentMode === 'range') {
+                if (fpRange.selectedDates.length > 0) {
+                    startDate = flatpickr.formatDate(fpRange.selectedDates[0], "Y-m-d");
+                    // Si l'utilisateur n'a cliqué qu'une fois dans le range, on sécurise :
+                    endDate = fpRange.selectedDates[1] 
+                        ? flatpickr.formatDate(fpRange.selectedDates[1], "Y-m-d") 
+                        : startDate;
+                }
             }
-
-            if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
 
             searchBtn.disabled = true;
             resultsDiv.style.display = 'none';
@@ -500,7 +657,13 @@
                     body: JSON.stringify({ prompt, startDate, endDate })
                 });
 
-                if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+                // DÉTECTION DE L'ERREUR ANTI-BOT (401 ou 403)
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        throw new Error("EXPIRED_SESSION");
+                    }
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -538,7 +701,19 @@
                     }
                 }
             } catch (err) {
-                statusDiv.textContent = "❌ Oups, impossible de se connecter à la boussole.";
+                // GESTION SPÉCIFIQUE DU MESSAGE D'ERREUR
+                if (err.message === "EXPIRED_SESSION") {
+                    statusDiv.innerHTML = `
+                        <div style="color: #b45309; background: #fef3c7; padding: 15px; border-radius: 8px; border: 1px solid #fde68a;">
+                            ⏱️ <strong>Session expirée</strong><br>
+                            Pour des raisons de sécurité, veuillez rafraîchir la page pour lancer une nouvelle recherche.
+                            <br><br>
+                            <button onclick="window.location.reload();" class="primary-btn" style="padding: 10px; font-size: 14px; width: auto; margin: 0 auto;">Rafraîchir la page</button>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.textContent = "❌ Oups, impossible de se connecter à la boussole.";
+                }
                 console.error(err);
             } finally {
                 searchBtn.disabled = false;

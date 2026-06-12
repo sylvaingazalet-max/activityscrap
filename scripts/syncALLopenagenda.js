@@ -27,7 +27,7 @@ if (allowInsecureTls) {
 const { getPrismaClient, disconnect } = require('../lib/prismaClient');
 
 const BATCH_SIZE = 100;
-const AGENDAS_FILE = 'agendas_lille.json';
+const AGENDAS_FILE = 'json/openAgendasFiltered.json';
 
 
 function safeDate(value) {

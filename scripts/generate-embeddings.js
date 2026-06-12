@@ -3,7 +3,7 @@
  *
  * PIPELINE HYBRIDE SÉCURISÉ :
  * 1. Gemini 2.5 Flash Lite : Analyse sémantique (enrichissement) + Extraction temporelle brute (Structured Output).
- * 2. Tri par priorités (6 Règles) : Utilisation des champs structurés (Begin/End) avant de basculer sur Chrono-node.
+ * 2. Tri par priorités (Règles Corrigées) : Priorité absolue au LLM si récurrence détectée, sinon fallback sur Chrono-node/existant.
  * 3. Gemini Embedding 2 : Vectorise les mots-clés et l'ambiance enrichis.
  * 4. PostgreSQL : Sauvegarde le vecteur, met à jour 'timings' et génère un 'daterange_fr' de secours si manquant.
  */
@@ -280,122 +280,119 @@ Analyse 'daterange_texte' et 'date_debut_reference' pour scinder la temporalité
           if (!parsedData.condensed_text) throw new Error("LLM returned empty condensed text");
 
           // ============================================================================
-          // --- ETAPE 2 : CALCUL DES DATES SELON LES 6 RÈGLES DE PRIORITÉ ---
+          // --- ETAPE 2 : CALCUL DES DATES SELON LES RÈGLES DE PRIORITÉ (CORRIGÉES) ---
           // ============================================================================
           let calculatedTimings = null;
-          let hasValidTimings = false;
+          const rule = parsedData.recurrence_rule || {};
 
-          if (event.timings && Array.isArray(event.timings) && event.timings.length > 0) {
-            hasValidTimings = true;
-            for (const t of event.timings) {
-              const durationHours = (new Date(t.end).getTime() - new Date(t.begin).getTime()) / (1000 * 60 * 60);
-              if (durationHours > 24) { 
-                hasValidTimings = false;
-                break;
-              }
+          // --- NOUVELLE RÈGLE MAÎTRESSE ---
+          // Si le LLM a formellement identifié une récurrence ou des dates spécifiques, on lui donne la priorité absolue.
+          if (parsedData.specific_dates && parsedData.specific_dates.length > 0) {
+            console.log(`  [RÈGLE LLM] Event ${eventId} : Dates spécifiques identifiées. Écrasement des timings.`);
+            calculatedTimings = [];
+            const startH = rule.start_time ? parseInt(rule.start_time.split(':')[0], 10) : 0;
+            const startM = rule.start_time ? parseInt(rule.start_time.split(':')[1], 10) : 0;
+            const endH = rule.end_time ? parseInt(rule.end_time.split(':')[0], 10) : 23;
+            const endM = rule.end_time ? parseInt(rule.end_time.split(':')[1], 10) : 59;
+
+            for (const dStr of parsedData.specific_dates) {
+              const dateObj = new Date(dStr);
+              if (isNaN(dateObj.getTime())) continue; 
+              
+              const beginDate = new Date(dateObj);
+              beginDate.setHours(startH, startM, 0, 0);
+              
+              const endDate = new Date(dateObj);
+              endDate.setHours(endH, endM, 59, 999);
+              
+              calculatedTimings.push({ begin: beginDate.toISOString(), end: endDate.toISOString() });
             }
-          }
+          } 
+          else if (parsedData.is_recurring && rule.weekdays && rule.weekdays.length > 0) {
+            console.log(`  [RÈGLE LLM] Event ${eventId} : Récurrence identifiée (Jours: ${rule.weekdays}). Écrasement des timings.`);
+            // On utilise les dates robustes de la BDD pour borner la récurrence plutôt que de confier le texte à chrono-node
+            const globalStart = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
+            const globalEnd = event.lastDateEnd ? new Date(event.lastDateEnd) : new Date(globalStart.getTime() + (180 * 24 * 60 * 60 * 1000)); 
 
-          if (hasValidTimings) {
-            console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides et courts conservés.`);
-            calculatedTimings = null;
-          } 
-          else if (event.firstDateBegin && event.lastDateEnd && 
-                   ((new Date(event.lastDateEnd).getTime() - new Date(event.firstDateBegin).getTime()) / (1000 * 60 * 60) <= 24)) {
-            console.log(`  [RÈGLE 2] Event ${eventId} : Utilisation du couple Begin/End court issu des colonnes.`);
-            calculatedTimings = [{
-              begin: new Date(event.firstDateBegin).toISOString(),
-              end: new Date(event.lastDateEnd).toISOString()
-            }];
-          } 
-          else if (event.firstDateBegin && !event.lastDateEnd) {
-            console.log(`  [RÈGLE 3] Event ${eventId} : Uniquement firstDateBegin présent. Création d'un créneau de +3h.`);
-            const startDate = new Date(event.firstDateBegin);
-            const endDate = new Date(startDate.getTime() + (3 * 60 * 60 * 1000));
-            calculatedTimings = [{
-              begin: startDate.toISOString(),
-              end: endDate.toISOString()
-            }];
+            calculatedTimings = expandRecurrence(globalStart, globalEnd, rule.weekdays, rule.start_time, rule.end_time);
           } 
           else {
-            const extractedText = parsedData.extracted_time_text;
-            const isValidExtractedText = extractedText && extractedText !== "null" && extractedText !== "[]" && extractedText.trim() !== "";
-
-            if (isValidExtractedText || event.dateRangeFr) {
-              const rule = parsedData.recurrence_rule || {};
-              
-              if (parsedData.specific_dates && parsedData.specific_dates.length > 0) {
-                calculatedTimings = [];
-                const startH = rule.start_time ? parseInt(rule.start_time.split(':')[0], 10) : 0;
-                const startM = rule.start_time ? parseInt(rule.start_time.split(':')[1], 10) : 0;
-                const endH = rule.end_time ? parseInt(rule.end_time.split(':')[0], 10) : 23;
-                const endM = rule.end_time ? parseInt(rule.end_time.split(':')[1], 10) : 59;
-                
-                for (const dStr of parsedData.specific_dates) {
-                  const dateObj = new Date(dStr);
-                  if (isNaN(dateObj.getTime())) continue; 
-                  
-                  const beginDate = new Date(dateObj);
-                  beginDate.setHours(startH, startM, 0, 0);
-                  
-                  const endDate = new Date(dateObj);
-                  endDate.setHours(endH, endM, 59, 999);
-                  
-                  calculatedTimings.push({ begin: beginDate.toISOString(), end: endDate.toISOString() });
-                }
-              } 
-              else if (parsedData.is_recurring && rule.weekdays) {
-                const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
-                const parsedDates = chrono.fr.parse(extractedText || event.dateRangeFr, referenceDate);
-                
-                if (parsedDates && parsedDates.length > 0) {
-                  const parsed = parsedDates[0];
-                  const globalStart = parsed.start.date();
-                  const globalEnd = parsed.end ? parsed.end.date() : new Date(globalStart.getTime() + (180 * 24 * 60 * 60 * 1000)); 
-
-                  calculatedTimings = expandRecurrence(globalStart, globalEnd, rule.weekdays, rule.start_time, rule.end_time);
-                }
-              } 
-              else {
-                const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
-                const parsedDates = chrono.fr.parse(extractedText || event.dateRangeFr, referenceDate);
-
-                if (parsedDates && parsedDates.length > 0) {
-                  calculatedTimings = parsedDates.map(parsed => {
-                    const startDate = parsed.start.date();
-                    if (!parsed.start.isCertain('hour') && rule.start_time) {
-                      startDate.setHours(parseInt(rule.start_time.split(':')[0]), parseInt(rule.start_time.split(':')[1]), 0, 0);
-                    }
-
-                    const endDate = parsed.end ? parsed.end.date() : new Date(startDate);
-                    if (!parsed.end) {
-                      if (!parsed.start.isCertain('hour') && !rule.end_time) {
-                        endDate.setHours(23, 59, 59, 999);
-                      } else if (rule.end_time) {
-                        endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
-                      } else {
-                        endDate.setHours(startDate.getHours() + 3);
-                      }
-                    } else if (!parsed.end.isCertain('hour') && rule.end_time) {
-                      endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
-                    }
-                    
-                    return { begin: startDate.toISOString(), end: endDate.toISOString() };
-                  });
+            // --- RÈGLES DE FALLBACK (Si le LLM n'a pas détecté de récurrence) ---
+            let hasValidTimings = false;
+            
+            if (event.timings && Array.isArray(event.timings) && event.timings.length > 0) {
+              hasValidTimings = true;
+              for (const t of event.timings) {
+                const durationHours = (new Date(t.end).getTime() - new Date(t.begin).getTime()) / (1000 * 60 * 60);
+                if (durationHours > 24) { 
+                  hasValidTimings = false;
+                  break;
                 }
               }
             }
 
-            if (!calculatedTimings || calculatedTimings.length === 0) {
-              if (event.timings && event.timings.length > 0) {
-                console.log(`  [RÈGLE 5] Event ${eventId} : Échec texte. Conservation des timings larges d'origine.`);
-                calculatedTimings = null; 
-              } else if (event.firstDateBegin && event.lastDateEnd) {
-                console.log(`  [RÈGLE 5] Event ${eventId} : Échec texte. Conversion du couple Begin/End large historique.`);
-                calculatedTimings = [{
-                  begin: new Date(event.firstDateBegin).toISOString(),
-                  end: new Date(event.lastDateEnd).toISOString()
-                }];
+            if (hasValidTimings) {
+              console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides et courts conservés.`);
+              calculatedTimings = null; // null signifiera "garder l'existant" lors de l'Update
+            } 
+            else if (event.firstDateBegin && event.lastDateEnd && 
+                     ((new Date(event.lastDateEnd).getTime() - new Date(event.firstDateBegin).getTime()) / (1000 * 60 * 60) <= 24)) {
+              console.log(`  [RÈGLE 2] Event ${eventId} : Utilisation du couple Begin/End court issu des colonnes.`);
+              calculatedTimings = [{
+                begin: new Date(event.firstDateBegin).toISOString(),
+                end: new Date(event.lastDateEnd).toISOString()
+              }];
+            } 
+            else if (event.firstDateBegin && !event.lastDateEnd) {
+              console.log(`  [RÈGLE 3] Event ${eventId} : Uniquement firstDateBegin présent. Création d'un créneau de +3h.`);
+              const startDate = new Date(event.firstDateBegin);
+              const endDate = new Date(startDate.getTime() + (3 * 60 * 60 * 1000));
+              calculatedTimings = [{
+                begin: startDate.toISOString(),
+                end: endDate.toISOString()
+              }];
+            } 
+            else {
+              // Ultime recours avec chrono-node si on n'a vraiment aucune autre option
+              const extractedText = parsedData.extracted_time_text;
+              const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
+              const parsedDates = chrono.fr.parse(extractedText || event.dateRangeFr || '', referenceDate);
+
+              if (parsedDates && parsedDates.length > 0) {
+                calculatedTimings = parsedDates.map(parsed => {
+                  const startDate = parsed.start.date();
+                  if (!parsed.start.isCertain('hour') && rule.start_time) {
+                    startDate.setHours(parseInt(rule.start_time.split(':')[0]), parseInt(rule.start_time.split(':')[1]), 0, 0);
+                  }
+
+                  const endDate = parsed.end ? parsed.end.date() : new Date(startDate);
+                  if (!parsed.end) {
+                    if (!parsed.start.isCertain('hour') && !rule.end_time) {
+                      endDate.setHours(23, 59, 59, 999);
+                    } else if (rule.end_time) {
+                      endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
+                    } else {
+                      endDate.setHours(startDate.getHours() + 3);
+                    }
+                  } else if (!parsed.end.isCertain('hour') && rule.end_time) {
+                    endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
+                  }
+                  
+                  return { begin: startDate.toISOString(), end: endDate.toISOString() };
+                });
+              }
+
+              if (!calculatedTimings || calculatedTimings.length === 0) {
+                if (event.timings && event.timings.length > 0) {
+                  console.log(`  [RÈGLE 5] Event ${eventId} : Échec LLM et Chrono. Conservation des timings larges d'origine.`);
+                  calculatedTimings = null; 
+                } else if (event.firstDateBegin && event.lastDateEnd) {
+                  console.log(`  [RÈGLE 5] Event ${eventId} : Échec LLM et Chrono. Conversion du couple Begin/End large historique.`);
+                  calculatedTimings = [{
+                    begin: new Date(event.firstDateBegin).toISOString(),
+                    end: new Date(event.lastDateEnd).toISOString()
+                  }];
+                }
               }
             }
           }

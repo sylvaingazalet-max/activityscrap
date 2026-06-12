@@ -20,7 +20,7 @@ if (allowInsecureTls) {
   console.warn('⚠️ Mode développement local : Vérification TLS désactivée');
 }
 
-const { getPrismaClient, disconnect } = require('../lib/prismaClient');
+const { getPrismaClient, disconnect } = require('../../lib/prismaClient');
 
 // ============================================================================
 // Configuration
