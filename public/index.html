@@ -392,7 +392,7 @@
 
         <div class="section">
             <label for="prompt">De quoi avez-vous envie ?</label>
-            <textarea id="prompt" placeholder="Ex : Sortie nature avec enfants, concert qui bouge, expo étrange en intérieur, pièce de théâtre drôle..."></textarea>
+            <textarea id="prompt" placeholder="Ex : sortie nature, voir un(e) humoriste,écouter de la musique classique,aller à un concert, exposition pour les enfants, faire du vélo ..."></textarea>
         </div>
         
         <button id="searchBtn" class="primary-btn">C'est parti!</button>
@@ -611,18 +611,16 @@
                 allRecommendations = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
             }
 
-            const introHtml = `<p style="font-size: 18px; font-weight: 600; color: var(--text-main); margin-bottom: 25px; text-align: center;">👋 ${data.message_intro}</p>`;
-            
+            // On crée directement le conteneur des cartes sans ajouter la phrase d'intro
             const cardsContainer = document.createElement('div');
             cardsContainer.id = 'cards-container';
-            
-            resultsDiv.innerHTML = introHtml;
             resultsDiv.appendChild(cardsContainer);
 
             if (allRecommendations.length > 0) {
                 renderNextBatch();
             } else {
-                resultsDiv.innerHTML += `<p style="text-align: center; color: var(--text-muted);">Aucun événement ne correspond à cette recherche.</p>`;
+                // Message propre si aucun résultat n'est retourné
+                resultsDiv.innerHTML = `<p style="text-align: center; color: var(--text-muted); font-size: 16px; font-weight: 500;">👋 Aucun événement ne correspond à cette recherche.</p>`;
             }
         }
 

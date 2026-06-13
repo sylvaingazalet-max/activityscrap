@@ -260,6 +260,9 @@ async function updateEventInDb(prisma, eventId, embeddingString, calculatedTimin
 async function processEvent(event, prisma, prepModel, embedModel) {
   const eventId = event.id;
   
+  // Règle de passe-droit (VIP Pass)
+  const isForced = event.ignoreReason === 'FORCED';
+  
   // On identifie s'il s'agit d'un leurre
   const isHoneypot = String(eventId).startsWith('honeypot_');
 
@@ -303,12 +306,14 @@ ${temporalTaskPrompt}`;
   const parsedData = JSON.parse(prepResult.response.text());
   
   // --- ETAPE 3 : APPLICATION DU FILTRE GÉOGRAPHIQUE IA ---
-  if (parsedData.is_lille_metropolis === false && !isHoneypot) {
+  if (parsedData.is_lille_metropolis === false && !isHoneypot && !isForced) {
     console.log(` 🚫 [IGNORE] Event ${eventId} : Hors Métropole Lilloise (Détecté par IA).`);
     await ignoreEventInDb(prisma, eventId, 'Hors zone géographique cible (Détection IA)');
     return 'ignored';
   } else if (isHoneypot && parsedData.is_lille_metropolis === false) {
     console.log(`  [INFO] Event ${eventId} : Honeypot détecté, on conserve l'événement malgré sa localisation.`);
+  } else if (isForced && parsedData.is_lille_metropolis === false) {
+    console.log(`  [INFO] Event ${eventId} : 🎟️ Passe-droit FORCED utilisé, événement conservé malgré le filtre IA (hors zone).`);
   }
 
   if (!parsedData.condensed_text) throw new Error("LLM returned empty condensed text");
@@ -322,13 +327,21 @@ ${temporalTaskPrompt}`;
     const timingEval = evaluateTimings(parsedData, event);
     
     if (timingEval.isTimingIncoherent) {
-      console.log(` 🚫 [IGNORE] Event ${eventId} : ${timingEval.ignoreReasonStr}`);
-      await ignoreEventInDb(prisma, eventId, timingEval.ignoreReasonStr);
-      return 'ignored';
+      if (isForced) {
+        console.log(`  [INFO] Event ${eventId} : 🎟️ Passe-droit FORCED utilisé, événement conservé malgré des dates incohérentes (${timingEval.ignoreReasonStr}).`);
+        // Génération d'un créneau de secours pour que l'intégration ne plante pas
+        const fallbackBegin = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
+        const fallbackEnd = event.lastDateEnd ? new Date(event.lastDateEnd) : new Date(fallbackBegin.getTime() + (3 * 60 * 60 * 1000));
+        calculatedTimings = [{ begin: fallbackBegin.toISOString(), end: fallbackEnd.toISOString() }];
+      } else {
+        console.log(` 🚫 [IGNORE] Event ${eventId} : ${timingEval.ignoreReasonStr}`);
+        await ignoreEventInDb(prisma, eventId, timingEval.ignoreReasonStr);
+        return 'ignored';
+      }
+    } else {
+      console.log(`  [RÈGLE LLM / FALLBACK] Event ${eventId} : ${timingEval.ruleApplied}.`);
+      calculatedTimings = timingEval.timings;
     }
-    
-    console.log(`  [RÈGLE LLM / FALLBACK] Event ${eventId} : ${timingEval.ruleApplied}.`);
-    calculatedTimings = timingEval.timings;
   }
 
   // --- ETAPE 5 : GÉNÉRATION DE L'EMBEDDING ---
@@ -396,12 +409,14 @@ async function main() {
     for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
       console.log(`\n🔄 Batch ${batchIdx + 1}/${totalBatches} - Fetching events...`);
 
+      // ⚠️ UPDATE ICI : Ajout de e.ignore_reason as "ignoreReason" dans le SELECT
       const eventsBatch = await prisma.$queryRaw`
         SELECT 
           e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr",
           e.category as "category", e.daterange_fr as "dateRangeFr", e.firstdate_begin as "firstDateBegin",
-          e.lastdate_end as "lastDateEnd", e.timings as "timings", l.location_name as "locationName",
-          l.location_district as "locationDistrict", l.location_city as "locationCity", l.location_coordinates as "locationCoordinates"
+          e.lastdate_end as "lastDateEnd", e.timings as "timings", e.ignore_reason as "ignoreReason",
+          l.location_name as "locationName", l.location_district as "locationDistrict", 
+          l.location_city as "locationCity", l.location_coordinates as "locationCoordinates"
         FROM events e
         LEFT JOIN locations l ON e.location_uid = l.location_uid
         WHERE e.embedding IS NULL AND e.is_ignored = false

@@ -110,7 +110,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche hybride en cours...' } });
+  sendEvent(res, { type: 'progress', data: { state: 'filtering', message: 'Recherche dans 180 agendas de la métropole...' } });
 
   let fallbackRecommendations = [];
 
@@ -176,7 +176,9 @@ module.exports = async (req, res) => {
         titre: e.titleFr || e.title_fr, 
         chapo: e.descriptionFr || e.description_fr || "Plus de détails sur la page de l'événement.",
         image_url: e.image,
-        lieu: e.locationName ? `${e.locationName} ${e.locationDistrict ? `(${e.locationDistrict})` : ''}` : 'Lille',
+        lieu: (e.locationName && e.locationDistrict) 
+          ? `${e.locationName} (${e.locationDistrict})` 
+          : (e.locationName || e.locationDistrict || 'Non précisé'),
         date_horaire: e.dateRangeFr || e.daterange_fr,
         tarif: e.conditionsFr || e.conditions_fr || 'Non précisé',
         url_reservation: e.canonicalUrl || e.canonicalurl,
