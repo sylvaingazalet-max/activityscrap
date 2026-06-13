@@ -259,7 +259,13 @@ async function updateEventInDb(prisma, eventId, embeddingString, calculatedTimin
 // ============================================================================
 async function processEvent(event, prisma, prepModel, embedModel) {
   const eventId = event.id;
-  const hasValidTimings = hasValidExistingTimings(event.timings);
+  
+  // On identifie s'il s'agit d'un leurre
+  const isHoneypot = String(eventId).startsWith('honeypot_');
+
+  // Si c'est un honeypot, on force la validité des dates pour 
+  // l'empêcher d'écraser la durée de 10 ans (qui dépasse la règle des 48h)
+  const hasValidTimings = isHoneypot ? true : hasValidExistingTimings(event.timings);
 
   // --- ETAPE 1 & 2 : PREPARATION VIA LLM ---
   const eventDataForAI = {
@@ -297,10 +303,12 @@ ${temporalTaskPrompt}`;
   const parsedData = JSON.parse(prepResult.response.text());
   
   // --- ETAPE 3 : APPLICATION DU FILTRE GÉOGRAPHIQUE IA ---
-  if (parsedData.is_lille_metropolis === false) {
+  if (parsedData.is_lille_metropolis === false && !isHoneypot) {
     console.log(` 🚫 [IGNORE] Event ${eventId} : Hors Métropole Lilloise (Détecté par IA).`);
     await ignoreEventInDb(prisma, eventId, 'Hors zone géographique cible (Détection IA)');
     return 'ignored';
+  } else if (isHoneypot && parsedData.is_lille_metropolis === false) {
+    console.log(`  [INFO] Event ${eventId} : Honeypot détecté, on conserve l'événement malgré sa localisation.`);
   }
 
   if (!parsedData.condensed_text) throw new Error("LLM returned empty condensed text");
@@ -309,7 +317,7 @@ ${temporalTaskPrompt}`;
   let calculatedTimings = null;
 
   if (hasValidTimings) {
-    console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides (<= 48h) conservés.`);
+    console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides conservés.`);
   } else {
     const timingEval = evaluateTimings(parsedData, event);
     
