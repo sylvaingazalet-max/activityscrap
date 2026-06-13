@@ -1,0 +1,26 @@
+========================================================================
+MODE OPÉRATOIRE : SYNCHRONISATION OPENAGENDA (PIPELINE EN 3 ÉTAPES)
+========================================================================
+
+PRÉREQUIS :
+Si le schéma de la base de données vient d'être mis à jour (ajout de la table open_agendas), il faut d'abord pousser les changements :
+> npx prisma db push
+
+--- ÉTAPE 1 : LA DÉCOUVERTE ---
+Commande : node ./scripts/openagenda/1_extractAgendas.js
+Rôle : Fouille le web (via géolocalisation Opendatasoft et recherche API mots-clés) pour trouver tous les agendas liés à la métropole lilloise.
+Résultat : Les nouveaux agendas sont insérés dans la table "open_agendas" de la base de données avec le statut "PENDING".
+
+--- ÉTAPE 2 : LE TRI INTELLIGENT (LLM) ---
+Commande : node ./scripts/openagenda/2_filterAgendas.js
+Rôle : Prend tous les agendas avec le statut "PENDING" et les soumet à Google Gemini. L'IA juge si l'agenda est pertinent (grand public, local) ou non (Pôle emploi, privé, hors métropole).
+Résultat : Le statut des agendas passe à "APPROVED" (conservé) ou "REJECTED" (exclu) dans la base de données.
+
+--- ÉTAPE 3 : LA COLLECTE DES ÉVÉNEMENTS ---
+Commande : node ./scripts/openagenda/3_syncEvents.js
+Rôle : Parcourt exclusivement les agendas ayant le statut "APPROVED". Télécharge leurs événements futurs et les injecte dans les tables "events" et "locations".
+Résultat : La base de données est mise à jour avec les nouveaux événements.
+
+ASTUCES :
+- Ces scripts sont conçus pour être rejouables à l'infini sans créer de doublons.
+- Si l'API Gemini plante lors de l'étape 2 (erreur 503), le script fait des pauses et retente automatiquement.

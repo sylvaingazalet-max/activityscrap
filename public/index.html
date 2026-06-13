@@ -234,9 +234,35 @@
         .event-meta span:last-child { margin-bottom: 0; }
 
         .event-desc {
-            margin: 0 0 15px 0;
+            margin: 0 0 5px 0;
             font-size: 15px;
             color: #4b5563;
+        }
+
+        .event-desc.clamped {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .read-more-btn {
+            display: block;
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            margin-bottom: 12px;
+            font-size: 14px;
+            transition: color 0.2s;
+            text-align: left;
+        }
+
+        .read-more-btn:hover {
+            text-decoration: underline;
+            color: var(--primary-hover);
         }
 
         .event-link {
@@ -350,9 +376,9 @@
             <label>Quand voulez-vous sortir ?</label>
             
             <div class="segmented-control" id="date-tabs">
-                <button class="active" data-mode="any">Peu importe</button>
-                <button data-mode="single">Un jour précis</button>
-                <button data-mode="range">Une période</button>
+                <button type="button" class="active" data-mode="any">Peu importe</button>
+                <button type="button" data-mode="single">Un jour précis</button>
+                <button type="button" data-mode="range">Une période</button>
             </div>
 
             <div id="date-single-container" class="hidden">
@@ -439,6 +465,13 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
     <script>
+        // --- Réveil anti "Cold Start" ---
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                fetch('/api/gemini', { method: 'HEAD' }).catch(() => {});
+            }
+        });
+
         // --- Gestion des modales ---
         function setupModal(modalId, openBtnId, closeBtnId) {
             const modal = document.getElementById(modalId);
@@ -461,48 +494,54 @@
 
         // --- Logique du formulaire & Calendriers ---
         
-        let currentMode = 'any'; // Par défaut, "Peu importe"
+        let currentMode = 'any';
         const tabs = document.querySelectorAll('#date-tabs button');
         const singleContainer = document.getElementById('date-single-container');
         const rangeContainer = document.getElementById('date-range-container');
 
-        // Configuration de base Flatpickr
         const fpConfig = {
             locale: "fr",
             minDate: "today",
             dateFormat: "Y-m-d",
             altInput: true,
             altFormat: "j F Y",
+            disableMobile: true // <-- Ajout pour empêcher le bug sur iOS
         };
 
-        // Initialisation pour "Un jour précis"
         const fpSingle = flatpickr("#dateSingle", fpConfig);
 
-        // Initialisation pour "Une période"
         const fpRange = flatpickr("#dateRange", {
             ...fpConfig,
             mode: "range"
         });
 
-        // Gestion du clic sur les onglets
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
-                // Maj de l'UI des onglets
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 
                 currentMode = tab.dataset.mode;
 
-                // Affichage conditionnel des calendriers
                 if (currentMode === 'any') {
                     singleContainer.classList.add('hidden');
                     rangeContainer.classList.add('hidden');
                 } else if (currentMode === 'single') {
                     singleContainer.classList.remove('hidden');
                     rangeContainer.classList.add('hidden');
+                    
+                    // Ouverture automatique du calendrier Single
+                    setTimeout(() => {
+                        fpSingle.open();
+                    }, 50);
+
                 } else if (currentMode === 'range') {
                     singleContainer.classList.add('hidden');
                     rangeContainer.classList.remove('hidden');
+                    
+                    // Ouverture automatique du calendrier Range
+                    setTimeout(() => {
+                        fpRange.open();
+                    }, 50);
                 }
             });
         });
@@ -513,7 +552,6 @@
         const resultsDiv = document.getElementById('results');
         const statusDiv = document.getElementById('status');
 
-        // Variables d'état pour la pagination
         let allRecommendations = [];
         let visibleCount = 0;
         const BATCH_SIZE = 3;
@@ -522,6 +560,19 @@
             const imageHtml = rec.image_url 
                 ? `<img src="${rec.image_url}" alt="${rec.titre}" class="event-image">` 
                 : '';
+
+            const chapo = rec.chapo || '';
+            const descId = 'desc-' + Math.random().toString(36).substr(2, 9);
+            let descHtml = '';
+            
+            if (chapo.length > 180) {
+                descHtml = `
+                    <p class="event-desc clamped" id="${descId}">${chapo}</p>
+                    <button class="read-more-btn" onclick="document.getElementById('${descId}').classList.remove('clamped'); this.remove();">Lire la suite...</button>
+                `;
+            } else {
+                descHtml = `<p class="event-desc" style="margin-bottom: 15px;">${chapo}</p>`;
+            }
 
             return `
                 <div class="event-card">
@@ -532,7 +583,7 @@
                         <span>📅 <strong>Quand :</strong> ${rec.date_horaire}</span>
                         <span>💶 <strong>Tarif :</strong> ${rec.tarif}</span>
                     </div>
-                    <p class="event-desc">${rec.chapo}</p>
+                    ${descHtml}
                     ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" class="event-link">En savoir plus / Réserver →</a>` : ''}
                 </div>
             `;
@@ -605,6 +656,20 @@
             }
         }
 
+        // --- Fonction de Retry (Tentative automatique) ---
+        async function fetchWithRetry(url, options, retries = 1) {
+            try {
+                return await fetch(url, options);
+            } catch (err) {
+                if (retries > 0) {
+                    console.log("Connexion échouée, tentative de réveil du serveur...");
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    return fetchWithRetry(url, options, retries - 1);
+                }
+                throw err;
+            }
+        }
+
         searchBtn.onclick = async () => {
             const prompt = document.getElementById('prompt').value.trim();
             if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
@@ -632,7 +697,8 @@
             statusDiv.innerHTML = '<div class="loading-spinner"></div> Recherche des meilleures sorties en cours...';
 
             try {
-                const response = await fetch('/api/gemini', {
+                // Utilisation de notre nouvelle fonction fetchWithRetry ici
+                const response = await fetchWithRetry('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt, startDate, endDate })

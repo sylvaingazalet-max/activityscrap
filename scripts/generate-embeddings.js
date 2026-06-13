@@ -1,16 +1,10 @@
 /**
- * Generate Embeddings for Events using Google Gemini API & Chrono-node
- *
- * PIPELINE HYBRIDE SÉCURISÉ :
- * 1. Gemini 2.5 Flash Lite : Analyse sémantique (enrichissement) + Extraction temporelle brute (Structured Output).
- * 2. Tri par priorités (Règles Corrigées) : Priorité absolue au LLM si récurrence détectée, sinon fallback sur Chrono-node/existant.
- * 3. Gemini Embedding 2 : Vectorise les mots-clés et l'ambiance enrichis.
- * 4. PostgreSQL : Sauvegarde le vecteur, met à jour 'timings' et génère un 'daterange_fr' de secours si manquant.
+ * Generate Embeddings for Events using Google Gemini API
+ * Refactored for better maintainability and readability.
  */
 
 const path = require('path');
 const dotenv = require('dotenv');
-const chrono = require('chrono-node');
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
@@ -39,17 +33,20 @@ const genAI = new GoogleGenerativeAI(apiKey);
 const responseSchema = {
   type: SchemaType.OBJECT,
   properties: {
+    is_lille_metropolis: {
+      type: SchemaType.BOOLEAN,
+      description: "TRUE si l'événement a lieu dans la Métropole Européenne de Lille (Lille, Roubaix, Tourcoing, Villeneuve d'Ascq, etc.). FALSE si c'est manifestement en dehors (ex: Valenciennes, Douai, Paris, Anzin, Belgique, etc.)."
+    },
     condensed_text: { 
       type: SchemaType.STRING, 
       description: "Tags, ambiance, cadre, public cible et contexte sémantique enrichi pour l'indexation vectorielle."
     },
-    extracted_time_text: { type: SchemaType.STRING, nullable: true },
     is_recurring: { type: SchemaType.BOOLEAN },
     specific_dates: {
       type: SchemaType.ARRAY,
       items: { type: SchemaType.STRING },
       nullable: true,
-      description: "Uniquement pour des dates isolées ou éparses (ex: '30 mai et 20 juin'). Format des éléments: YYYY-MM-DD. Laisse vide si récurrent."
+      description: "Uniquement pour des dates isolées ou éparses. Format: YYYY-MM-DD."
     },
     recurrence_rule: {
       type: SchemaType.OBJECT,
@@ -65,33 +62,27 @@ const responseSchema = {
       }
     }
   },
-  required: ["condensed_text", "is_recurring"]
+  required: ["is_lille_metropolis", "condensed_text", "is_recurring"]
 };
 
 // ============================================================================
-// Utilitaires
+// Utilitaires Généraux
 // ============================================================================
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Fonction générique pour appeler l'API Gemini avec Retry (gère les 429 et 503)
- */
 async function callAIWithRetry(actionFn, retries = 3, delayMs = 3000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await actionFn();
     } catch (err) {
       const errMsg = err.message || '';
-      const isRecoverableError = errMsg.includes('429') || 
-                                 errMsg.includes('503') ||
+      const isRecoverableError = errMsg.includes('429') || errMsg.includes('503') ||
                                  errMsg.toLowerCase().includes('rate limit') || 
                                  errMsg.toLowerCase().includes('quota') ||
                                  errMsg.toLowerCase().includes('overloaded');
       
       if (isRecoverableError && attempt < retries) {
-        console.warn(`⚠️ API Overloaded (${errMsg.substring(0, 30)}...). Attempt ${attempt}/${retries}. Retrying in ${delayMs}ms...`);
+        console.warn(`⚠️ API Overloaded. Attempt ${attempt}/${retries}. Retrying in ${delayMs}ms...`);
         await sleep(delayMs);
         delayMs *= 2; 
       } else {
@@ -101,9 +92,21 @@ async function callAIWithRetry(actionFn, retries = 3, delayMs = 3000) {
   }
 }
 
-/**
- * Génère un tableau de timings pour les événements récurrents
- */
+// ============================================================================
+// Logique Métier : Temps & Dates
+// ============================================================================
+function hasValidExistingTimings(timings) {
+  if (!timings || !Array.isArray(timings) || timings.length === 0) return false;
+  
+  for (const t of timings) {
+    const durationHours = (new Date(t.end).getTime() - new Date(t.begin).getTime()) / (1000 * 60 * 60);
+    if (durationHours > 48) { 
+      return false;
+    }
+  }
+  return true;
+}
+
 function expandRecurrence(globalStartDate, globalEndDate, weekdays, startTime, endTime) {
   const timings = [];
   const current = new Date(globalStartDate);
@@ -111,7 +114,6 @@ function expandRecurrence(globalStartDate, globalEndDate, weekdays, startTime, e
 
   const startH = startTime ? parseInt(startTime.split(':')[0], 10) : 0;
   const startM = startTime ? parseInt(startTime.split(':')[1], 10) : 0;
-  
   const endH = endTime ? parseInt(endTime.split(':')[0], 10) : 23;
   const endM = endTime ? parseInt(endTime.split(':')[1], 10) : 59;
 
@@ -138,10 +140,6 @@ function expandRecurrence(globalStartDate, globalEndDate, weekdays, startTime, e
   return timings;
 }
 
-/**
- * Génère un daterange_fr formaté propre (ex: "du 14/05/2024 10h au 14/05/2024 12h")
- * Limite à 3 éléments max pour ne pas polluer.
- */
 function generateDateRangeFrString(timings) {
   if (!timings || !Array.isArray(timings) || timings.length === 0) return null;
 
@@ -156,27 +154,205 @@ function generateDateRangeFrString(timings) {
   };
 
   const maxItems = Math.min(timings.length, 3);
-  const parts = [];
-
-  for (let i = 0; i < maxItems; i++) {
-    const t = timings[i];
-    if (t.begin && t.end) {
-      parts.push(`du ${formatPart(t.begin)} au ${formatPart(t.end)}`);
-    } else if (t.begin) {
-      parts.push(`le ${formatPart(t.begin)}`);
-    }
-  }
+  const parts = timings.slice(0, maxItems).map(t => {
+    if (t.begin && t.end) return `du ${formatPart(t.begin)} au ${formatPart(t.end)}`;
+    if (t.begin) return `le ${formatPart(t.begin)}`;
+    return '';
+  });
 
   let result = parts.join(', ');
-  if (timings.length > 3) {
-    result += ' ...';
-  }
+  if (timings.length > 3) result += ' ...';
 
   return result;
 }
 
+function evaluateTimings(parsedData, event) {
+  const rule = parsedData.recurrence_rule || {};
+  const globalStart = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
+  const globalEnd = event.lastDateEnd ? new Date(event.lastDateEnd) : null;
+  
+  if (globalEnd && globalEnd < globalStart) {
+    return { isTimingIncoherent: true, ignoreReasonStr: "Timing invalide : date de fin antérieure à la date de début.", timings: null };
+  } 
+
+  const effectiveEnd = globalEnd ? globalEnd : new Date(globalStart.getTime() + (180 * 24 * 60 * 60 * 1000));
+  const durationTotalHours = (effectiveEnd.getTime() - globalStart.getTime()) / (1000 * 60 * 60);
+
+  let calculatedTimings = [];
+
+  if (parsedData.specific_dates && parsedData.specific_dates.length > 0) {
+    const startH = rule.start_time ? parseInt(rule.start_time.split(':')[0], 10) : 0;
+    const startM = rule.start_time ? parseInt(rule.start_time.split(':')[1], 10) : 0;
+    const endH = rule.end_time ? parseInt(rule.end_time.split(':')[0], 10) : 23;
+    const endM = rule.end_time ? parseInt(rule.end_time.split(':')[1], 10) : 59;
+
+    for (const dStr of parsedData.specific_dates) {
+      const dateObj = new Date(dStr);
+      if (isNaN(dateObj.getTime())) continue; 
+      
+      const beginDate = new Date(dateObj);
+      beginDate.setHours(startH, startM, 0, 0);
+      
+      const endDate = new Date(dateObj);
+      endDate.setHours(endH, endM, 59, 999);
+      
+      calculatedTimings.push({ begin: beginDate.toISOString(), end: endDate.toISOString() });
+    }
+    return { isTimingIncoherent: false, ignoreReasonStr: null, timings: calculatedTimings, ruleApplied: 'Dates spécifiques' };
+  } 
+  
+  if (parsedData.is_recurring && rule.weekdays && rule.weekdays.length > 0) {
+    calculatedTimings = expandRecurrence(globalStart, effectiveEnd, rule.weekdays, rule.start_time, rule.end_time);
+    if (calculatedTimings.length === 0) {
+      return { isTimingIncoherent: true, ignoreReasonStr: "Timing invalide : la récurrence générée ne correspond à aucun jour dans la période globale.", timings: null };
+    }
+    return { isTimingIncoherent: false, ignoreReasonStr: null, timings: calculatedTimings, ruleApplied: `Récurrence sémantique (Jours: ${rule.weekdays})` };
+  } 
+  
+  if (globalEnd && durationTotalHours <= 48) {
+    calculatedTimings = [{ begin: globalStart.toISOString(), end: globalEnd.toISOString() }];
+    return { isTimingIncoherent: false, ignoreReasonStr: null, timings: calculatedTimings, ruleApplied: 'Période courte (<= 48h) de Begin à End' };
+  } 
+  
+  const endDate = new Date(globalStart.getTime() + (3 * 60 * 60 * 1000));
+  calculatedTimings = [{ begin: globalStart.toISOString(), end: endDate.toISOString() }];
+  return { isTimingIncoherent: false, ignoreReasonStr: null, timings: calculatedTimings, ruleApplied: 'Création d\'un créneau générique +3h par défaut' };
+}
+
 // ============================================================================
-// Main Execution Function
+// Service d'Enregistrement BDD
+// ============================================================================
+async function ignoreEventInDb(prisma, eventId, reason) {
+  await prisma.$executeRawUnsafe('UPDATE events SET is_ignored = true, ignore_reason = $1 WHERE uid = $2', reason, eventId);
+}
+
+async function updateEventInDb(prisma, eventId, embeddingString, calculatedTimings, generatedDateRangeFr) {
+  if (calculatedTimings && calculatedTimings.length > 0) {
+    if (generatedDateRangeFr) {
+      await prisma.$executeRawUnsafe(
+        'UPDATE events SET embedding = $1::vector, timings = $3::jsonb, daterange_fr = $4 WHERE uid = $2',
+        embeddingString, eventId, JSON.stringify(calculatedTimings), generatedDateRangeFr
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        'UPDATE events SET embedding = $1::vector, timings = $3::jsonb WHERE uid = $2',
+        embeddingString, eventId, JSON.stringify(calculatedTimings)
+      );
+    }
+  } else {
+    if (generatedDateRangeFr) {
+      await prisma.$executeRawUnsafe(
+        'UPDATE events SET embedding = $1::vector, daterange_fr = $3 WHERE uid = $2',
+        embeddingString, eventId, generatedDateRangeFr
+      );
+    } else {
+      await prisma.$executeRawUnsafe(
+        'UPDATE events SET embedding = $1::vector WHERE uid = $2',
+        embeddingString, eventId
+      );
+    }
+  }
+}
+
+// ============================================================================
+// Processus Core (Un Événement)
+// ============================================================================
+async function processEvent(event, prisma, prepModel, embedModel) {
+  const eventId = event.id;
+  const hasValidTimings = hasValidExistingTimings(event.timings);
+
+  // --- ETAPE 1 & 2 : PREPARATION VIA LLM ---
+  const eventDataForAI = {
+    titre: event.titleFr,
+    description: event.descriptionFr,
+    daterange_texte: event.dateRangeFr,
+    date_debut_globale: event.firstDateBegin,
+    date_fin_globale: event.lastDateEnd,
+    lieu_nom: event.locationName || "Inconnu",
+    lieu_ville: event.locationCity || "Inconnue"
+  };
+
+  const temporalTaskPrompt = hasValidTimings 
+    ? `TACHE 3 - Temporalité : IGNORE CETTE ÉTAPE. Les dates sont déjà parfaites. Renvoie simplement is_recurring=false et laisse les dates vides.`
+    : `TACHE 3 - Temporalité fine (is_recurring, recurrence_rule, specific_dates) :
+Analyse sémantiquement le titre, la description et daterange_texte pour comprendre la logique de l'événement.
+- Si l'événement a lieu à des dates éparses précises, mets-les dans 'specific_dates' (YYYY-MM-DD) et is_recurring=false.
+- Si l'événement se répète chaque semaine, mets is_recurring=true et remplis 'weekdays'.
+- Extrait 'start_time' et 'end_time' (Format HH:MM) si présents.`;
+
+  const systemPrompt = `Tu es un expert en extraction de données culturelles.
+
+Voici les données de l'événement :
+${JSON.stringify(eventDataForAI, null, 2)}
+
+TACHE 1 - Filtre Géographique (CRUCIAL) :
+Analyse le titre, la description, et les champs de lieu. Si l'événement ne se déroule PAS dans la Métropole Européenne de Lille (MEL) ou ses communes limitrophes immédiates, tu dois impérativement renvoyer "is_lille_metropolis": false. Attention, des villes comme Valenciennes, Anzin, Saultain, Douai ou Lens sont considérées comme HORS ZONE.
+
+TACHE 2 - Enrichissement sémantique (condensed_text) :
+Génère une suite de mots-clés liés à l'ambiance et au thème. SUPPRIME TOUTES LES DATES ET HEURES de ce champ.
+
+${temporalTaskPrompt}`;
+
+  const prepResult = await callAIWithRetry(() => prepModel.generateContent(systemPrompt));
+  const parsedData = JSON.parse(prepResult.response.text());
+  
+  // --- ETAPE 3 : APPLICATION DU FILTRE GÉOGRAPHIQUE IA ---
+  if (parsedData.is_lille_metropolis === false) {
+    console.log(` 🚫 [IGNORE] Event ${eventId} : Hors Métropole Lilloise (Détecté par IA).`);
+    await ignoreEventInDb(prisma, eventId, 'Hors zone géographique cible (Détection IA)');
+    return 'ignored';
+  }
+
+  if (!parsedData.condensed_text) throw new Error("LLM returned empty condensed text");
+
+  // --- ETAPE 4 : CALCUL DES DATES & DÉTECTION D'INCOHÉRENCES ---
+  let calculatedTimings = null;
+
+  if (hasValidTimings) {
+    console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides (<= 48h) conservés.`);
+  } else {
+    const timingEval = evaluateTimings(parsedData, event);
+    
+    if (timingEval.isTimingIncoherent) {
+      console.log(` 🚫 [IGNORE] Event ${eventId} : ${timingEval.ignoreReasonStr}`);
+      await ignoreEventInDb(prisma, eventId, timingEval.ignoreReasonStr);
+      return 'ignored';
+    }
+    
+    console.log(`  [RÈGLE LLM / FALLBACK] Event ${eventId} : ${timingEval.ruleApplied}.`);
+    calculatedTimings = timingEval.timings;
+  }
+
+  // --- ETAPE 5 : GÉNÉRATION DE L'EMBEDDING ---
+  const embedResult = await callAIWithRetry(() => embedModel.embedContent({
+    content: { parts: [{ text: parsedData.condensed_text }] },
+    taskType: 'RETRIEVAL_DOCUMENT',
+    outputDimensionality: 768
+  }));
+
+  const embeddingString = `[${embedResult.embedding.values.join(',')}]`;
+
+  // --- ETAPE 6 : MISE A JOUR BASE DE DONNEES ---
+  const finalTimings = (calculatedTimings && calculatedTimings.length > 0) ? calculatedTimings : event.timings;
+  let generatedDateRangeFr = null;
+
+  if ((!event.dateRangeFr || event.dateRangeFr.trim() === '') && finalTimings && finalTimings.length > 0) {
+    generatedDateRangeFr = generateDateRangeFrString(finalTimings);
+  }
+
+  await updateEventInDb(prisma, eventId, embeddingString, calculatedTimings, generatedDateRangeFr);
+
+  if (calculatedTimings && calculatedTimings.length > 0) {
+    console.log(`  [INFO] Event ${eventId} : Timings mis à jour (Nbr: ${calculatedTimings.length}) et Vectorisé.`);
+  } else {
+    console.log(`  [INFO] Event ${eventId} : Vectorisé (Colonne timings d'origine conservée).`);
+  }
+
+  return 'success';
+}
+
+// ============================================================================
+// Main Execution
 // ============================================================================
 async function main() {
   console.log('🚀 Starting smart embedding & dates generation process...');
@@ -186,14 +362,14 @@ async function main() {
     const missingEmbeddingsResult = await prisma.$queryRaw`
       SELECT COUNT(*)::int as count 
       FROM events 
-      WHERE embedding IS NULL
+      WHERE embedding IS NULL AND is_ignored = false
     `;
     
     const totalMissing = missingEmbeddingsResult[0]?.count || 0;
-    console.log(`📊 Found ${totalMissing} events with missing embeddings.`);
+    console.log(`📊 Found ${totalMissing} events pending evaluation.`);
 
     if (totalMissing === 0) {
-      console.log('✅ All events already have embeddings. Nothing to do!');
+      console.log('✅ All valid events already have embeddings. Nothing to do!');
       return;
     }
 
@@ -214,257 +390,34 @@ async function main() {
 
       const eventsBatch = await prisma.$queryRaw`
         SELECT 
-          e.uid as "id",
-          e.title_fr as "titleFr",
-          e.description_fr as "descriptionFr",
-          e.category as "category",
-          e.daterange_fr as "dateRangeFr",
-          e.firstdate_begin as "firstDateBegin",
-          e.lastdate_end as "lastDateEnd",
-          e.timings as "timings",
-          l.location_name as "locationName",
-          l.location_district as "locationDistrict",
-          l.location_city as "locationCity"
+          e.uid as "id", e.title_fr as "titleFr", e.description_fr as "descriptionFr",
+          e.category as "category", e.daterange_fr as "dateRangeFr", e.firstdate_begin as "firstDateBegin",
+          e.lastdate_end as "lastDateEnd", e.timings as "timings", l.location_name as "locationName",
+          l.location_district as "locationDistrict", l.location_city as "locationCity", l.location_coordinates as "locationCoordinates"
         FROM events e
         LEFT JOIN locations l ON e.location_uid = l.location_uid
-        WHERE e.embedding IS NULL
+        WHERE e.embedding IS NULL AND e.is_ignored = false
         ORDER BY e.uid ASC
         LIMIT ${BATCH_SIZE}
       `;
 
       if (eventsBatch.length === 0) break;
 
-      let processedInBatch = 0;
-      let failedInBatch = 0;
+      let stats = { processed: 0, ignored: 0, failed: 0 };
 
       for (const event of eventsBatch) {
-        const eventId = event.id;
-        
-        // ============================================================================
-        // --- ETAPE 1 : PREPARATION VIA LLM (Sémantique) ---
-        // ============================================================================
-        const eventDataForAI = {
-          titre: event.titleFr,
-          description: event.descriptionFr,
-          categorie: event.category,
-          lieu: `${event.locationName || ''} ${event.locationDistrict || ''} ${event.locationCity || ''}`.trim(),
-          daterange_texte: event.dateRangeFr,
-          date_debut_reference: event.firstDateBegin,
-          timings_actuels: event.timings ? JSON.stringify(event.timings) : null
-        };
-
-        const systemPrompt = `Tu es un expert en recommandation d'événements et en indexation sémantique. Ton rôle est d'enrichir le contexte d'un événement pour optimiser sa recherche vectorielle par des utilisateurs finaux.
-
-Voici les données brutes de l'événement :
-${JSON.stringify(eventDataForAI, null, 2)}
-
-TACHE 1 - Enrichissement sémantique des mots-clés (condensed_text) :
-Génère une suite logique de mots-clés, synonymes, tags et concepts sémantiques larges. Explicite impérativement l'ambiance, le cadre physique, le public cible et la nature de l'expérience.
-⚠️ RÈGLE CRUCIALE : SUPPRIME TOUTES LES DATES, HEURES, JOURS DE LA SEMAINE OU ANNÉES de ce champ.
-
-TACHE 2 - Extraction temporelle brute (extracted_time_text) :
-Si "timings_actuels" contient déjà des dates valides (et pas un bloc immense de plusieurs jours/semaines), renvoie null.
-Sinon, extrait fidèlement l'expression exacte de la date depuis le texte brut pour traitement ultérieur.
-
-TACHE 3 - Temporalité fine (is_recurring, recurrence_rule, specific_dates) :
-Analyse 'daterange_texte' et 'date_debut_reference' pour scinder la temporalité dans un de ces cas précis :
-- CAS 1 (Période Longue Continue) : Si l'événement dure des semaines/mois entiers (ex: 'du 14 nov au 19 juin') sans précision, mets is_recurring=true et force weekdays avec TOUS les jours: [0, 1, 2, 3, 4, 5, 6].
-- CAS 2 (Récurrence Ciblée) : S'il se répète certains jours (ex: 'les mercredis', 'certains jeudis'), mets is_recurring=true et donne le(s) jour(s) exact(s) dans weekdays. RÈGLE ABSOLUE POUR LES INDEX : 0=Dimanche, 1=Lundi, 2=Mardi, 3=Mercredi, 4=Jeudi, 5=Vendredi, 6=Samedi. Ne te trompe pas (ex: Mercredi = 3, pas 2).
-- CAS 3 (Dates Éparses Isolées) : S'il s'agit de dates précises (ex: '30 mai et 20 juin'), mets is_recurring=false, laisse recurrence_rule vide (sauf les heures) et liste ces dates dans 'specific_dates' au format YYYY-MM-DD. Déduis l'année grâce à date_debut_reference.
-- Dans TOUS LES CAS : Précise 'start_time' et 'end_time' (Format HH:MM) dans recurrence_rule si l'heure est déduite des timings_actuels ou du texte.`;
-
         try {
-          const prepResult = await callAIWithRetry(() => prepModel.generateContent(systemPrompt));
-          const parsedData = JSON.parse(prepResult.response.text());
-          
-          if (!parsedData.condensed_text) throw new Error("LLM returned empty condensed text");
-
-          // ============================================================================
-          // --- ETAPE 2 : CALCUL DES DATES SELON LES RÈGLES DE PRIORITÉ (CORRIGÉES) ---
-          // ============================================================================
-          let calculatedTimings = null;
-          const rule = parsedData.recurrence_rule || {};
-
-          // --- NOUVELLE RÈGLE MAÎTRESSE ---
-          // Si le LLM a formellement identifié une récurrence ou des dates spécifiques, on lui donne la priorité absolue.
-          if (parsedData.specific_dates && parsedData.specific_dates.length > 0) {
-            console.log(`  [RÈGLE LLM] Event ${eventId} : Dates spécifiques identifiées. Écrasement des timings.`);
-            calculatedTimings = [];
-            const startH = rule.start_time ? parseInt(rule.start_time.split(':')[0], 10) : 0;
-            const startM = rule.start_time ? parseInt(rule.start_time.split(':')[1], 10) : 0;
-            const endH = rule.end_time ? parseInt(rule.end_time.split(':')[0], 10) : 23;
-            const endM = rule.end_time ? parseInt(rule.end_time.split(':')[1], 10) : 59;
-
-            for (const dStr of parsedData.specific_dates) {
-              const dateObj = new Date(dStr);
-              if (isNaN(dateObj.getTime())) continue; 
-              
-              const beginDate = new Date(dateObj);
-              beginDate.setHours(startH, startM, 0, 0);
-              
-              const endDate = new Date(dateObj);
-              endDate.setHours(endH, endM, 59, 999);
-              
-              calculatedTimings.push({ begin: beginDate.toISOString(), end: endDate.toISOString() });
-            }
-          } 
-          else if (parsedData.is_recurring && rule.weekdays && rule.weekdays.length > 0) {
-            console.log(`  [RÈGLE LLM] Event ${eventId} : Récurrence identifiée (Jours: ${rule.weekdays}). Écrasement des timings.`);
-            // On utilise les dates robustes de la BDD pour borner la récurrence plutôt que de confier le texte à chrono-node
-            const globalStart = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
-            const globalEnd = event.lastDateEnd ? new Date(event.lastDateEnd) : new Date(globalStart.getTime() + (180 * 24 * 60 * 60 * 1000)); 
-
-            calculatedTimings = expandRecurrence(globalStart, globalEnd, rule.weekdays, rule.start_time, rule.end_time);
-          } 
-          else {
-            // --- RÈGLES DE FALLBACK (Si le LLM n'a pas détecté de récurrence) ---
-            let hasValidTimings = false;
-            
-            if (event.timings && Array.isArray(event.timings) && event.timings.length > 0) {
-              hasValidTimings = true;
-              for (const t of event.timings) {
-                const durationHours = (new Date(t.end).getTime() - new Date(t.begin).getTime()) / (1000 * 60 * 60);
-                if (durationHours > 24) { 
-                  hasValidTimings = false;
-                  break;
-                }
-              }
-            }
-
-            if (hasValidTimings) {
-              console.log(`  [RÈGLE 1] Event ${eventId} : Timings actuels valides et courts conservés.`);
-              calculatedTimings = null; // null signifiera "garder l'existant" lors de l'Update
-            } 
-            else if (event.firstDateBegin && event.lastDateEnd && 
-                     ((new Date(event.lastDateEnd).getTime() - new Date(event.firstDateBegin).getTime()) / (1000 * 60 * 60) <= 24)) {
-              console.log(`  [RÈGLE 2] Event ${eventId} : Utilisation du couple Begin/End court issu des colonnes.`);
-              calculatedTimings = [{
-                begin: new Date(event.firstDateBegin).toISOString(),
-                end: new Date(event.lastDateEnd).toISOString()
-              }];
-            } 
-            else if (event.firstDateBegin && !event.lastDateEnd) {
-              console.log(`  [RÈGLE 3] Event ${eventId} : Uniquement firstDateBegin présent. Création d'un créneau de +3h.`);
-              const startDate = new Date(event.firstDateBegin);
-              const endDate = new Date(startDate.getTime() + (3 * 60 * 60 * 1000));
-              calculatedTimings = [{
-                begin: startDate.toISOString(),
-                end: endDate.toISOString()
-              }];
-            } 
-            else {
-              // Ultime recours avec chrono-node si on n'a vraiment aucune autre option
-              const extractedText = parsedData.extracted_time_text;
-              const referenceDate = event.firstDateBegin ? new Date(event.firstDateBegin) : new Date();
-              const parsedDates = chrono.fr.parse(extractedText || event.dateRangeFr || '', referenceDate);
-
-              if (parsedDates && parsedDates.length > 0) {
-                calculatedTimings = parsedDates.map(parsed => {
-                  const startDate = parsed.start.date();
-                  if (!parsed.start.isCertain('hour') && rule.start_time) {
-                    startDate.setHours(parseInt(rule.start_time.split(':')[0]), parseInt(rule.start_time.split(':')[1]), 0, 0);
-                  }
-
-                  const endDate = parsed.end ? parsed.end.date() : new Date(startDate);
-                  if (!parsed.end) {
-                    if (!parsed.start.isCertain('hour') && !rule.end_time) {
-                      endDate.setHours(23, 59, 59, 999);
-                    } else if (rule.end_time) {
-                      endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
-                    } else {
-                      endDate.setHours(startDate.getHours() + 3);
-                    }
-                  } else if (!parsed.end.isCertain('hour') && rule.end_time) {
-                    endDate.setHours(parseInt(rule.end_time.split(':')[0]), parseInt(rule.end_time.split(':')[1]), 59, 999);
-                  }
-                  
-                  return { begin: startDate.toISOString(), end: endDate.toISOString() };
-                });
-              }
-
-              if (!calculatedTimings || calculatedTimings.length === 0) {
-                if (event.timings && event.timings.length > 0) {
-                  console.log(`  [RÈGLE 5] Event ${eventId} : Échec LLM et Chrono. Conservation des timings larges d'origine.`);
-                  calculatedTimings = null; 
-                } else if (event.firstDateBegin && event.lastDateEnd) {
-                  console.log(`  [RÈGLE 5] Event ${eventId} : Échec LLM et Chrono. Conversion du couple Begin/End large historique.`);
-                  calculatedTimings = [{
-                    begin: new Date(event.firstDateBegin).toISOString(),
-                    end: new Date(event.lastDateEnd).toISOString()
-                  }];
-                }
-              }
-            }
-          }
-
-          // ============================================================================
-          // --- ETAPE 3 : GÉNÉRATION DE L'EMBEDDING ---
-          // ============================================================================
-          console.log(`  [DEBUG] Texte sémantique envoyé à l'embedding (ID: ${eventId}) : "${parsedData.condensed_text}"`);
-          const embedResult = await callAIWithRetry(() => embedModel.embedContent({
-            content: { parts: [{ text: parsedData.condensed_text }] },
-            taskType: 'RETRIEVAL_DOCUMENT', // Indique que c'est une donnée à stocker pour être cherchée plus tard
-            outputDimensionality: 768
-          }));
-
-          const embeddingString = `[${embedResult.embedding.values.join(',')}]`;
-
-          // ============================================================================
-          // --- ETAPE 4 : MISE A JOUR BASE DE DONNEES ET DATERANGE_FR ---
-          // ============================================================================
-          
-          // Récupération des timings finaux pour générer le daterange s'il manque
-          const finalTimings = (calculatedTimings && calculatedTimings.length > 0) ? calculatedTimings : event.timings;
-          let generatedDateRangeFr = null;
-
-          // Génération du daterange_fr s'il est vide/null dans les données d'origine
-          if ((!event.dateRangeFr || event.dateRangeFr.trim() === '') && finalTimings && finalTimings.length > 0) {
-            generatedDateRangeFr = generateDateRangeFrString(finalTimings);
-            console.log(`  [INFO] Event ${eventId} : daterange_fr généré -> "${generatedDateRangeFr}"`);
-          }
-
-          // Mise à jour de la base de données selon 4 scénarios (avec/sans timings calculés, avec/sans daterange_fr généré)
-          if (calculatedTimings && calculatedTimings.length > 0) {
-            console.log(`  [INFO] Event ${eventId} : Timings mis à jour (Nbr: ${calculatedTimings.length}) et Vectorisé.`);
-            if (generatedDateRangeFr) {
-              await prisma.$executeRawUnsafe(
-                'UPDATE events SET embedding = $1::vector, timings = $3::jsonb, daterange_fr = $4 WHERE uid = $2',
-                embeddingString, eventId, JSON.stringify(calculatedTimings), generatedDateRangeFr
-              );
-            } else {
-              await prisma.$executeRawUnsafe(
-                'UPDATE events SET embedding = $1::vector, timings = $3::jsonb WHERE uid = $2',
-                embeddingString, eventId, JSON.stringify(calculatedTimings)
-              );
-            }
-          } else {
-            console.log(`  [INFO] Event ${eventId} : Vectorisé (Colonne timings d'origine conservée).`);
-            if (generatedDateRangeFr) {
-              await prisma.$executeRawUnsafe(
-                'UPDATE events SET embedding = $1::vector, daterange_fr = $3 WHERE uid = $2',
-                embeddingString, eventId, generatedDateRangeFr
-              );
-            } else {
-              await prisma.$executeRawUnsafe(
-                'UPDATE events SET embedding = $1::vector WHERE uid = $2',
-                embeddingString, eventId
-              );
-            }
-          }
-
-          processedInBatch++;
+          const result = await processEvent(event, prisma, prepModel, embedModel);
+          if (result === 'success') stats.processed++;
+          if (result === 'ignored') stats.ignored++;
         } catch (err) {
-          failedInBatch++;
-          console.error(`❌ Failed to process event ${eventId}:`, err.message);
+          stats.failed++;
+          console.error(`❌ Failed to process event ${event.id}:`, err.message);
         }
       }
 
-      console.log(`Batch ${batchIdx + 1}/${totalBatches} completed. Success: ${processedInBatch}, Failures: ${failedInBatch}`);
-
-      // Pause entre les batchs pour respecter les quotas
-      if (batchIdx < totalBatches - 1) {
-        await sleep(2000);
-      }
+      console.log(`Batch ${batchIdx + 1}/${totalBatches} completed. Success: ${stats.processed}, Ignored: ${stats.ignored}, Failures: ${stats.failed}`);
+      if (batchIdx < totalBatches - 1) await sleep(2000);
     }
 
     console.log('🎉 Smart embedding generation process completed successfully!');
