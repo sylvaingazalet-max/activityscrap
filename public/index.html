@@ -90,14 +90,13 @@
             margin-bottom: 25px;
         }
 
+        /* Remis en minuscule (sans text-transform) et taille ajustée */
         label {
             display: block;
             font-weight: 600;
             margin-bottom: 10px;
             color: var(--text-main);
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 15px; 
         }
 
         .segmented-control {
@@ -121,9 +120,10 @@
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        /* Remis en orange (var(--primary)) pour l'état actif */
         .segmented-control button.active {
             background: white;
-            color: var(--text-main);
+            color: var(--primary);
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
@@ -410,7 +410,7 @@
                 <img src="logo.png" alt="La boussole de Lille" class="brand-logo-small">
                 <h1><span>La boussole de Lille</span></h1>
             </div>
-            <p class="brand-tagline">Recherche de sorties culturelles et d'événements locaux.</p>
+            <p class="brand-tagline">L'analyse sémantique factuelle pour vos sorties culturelles et événements locaux.</p>
         </div>
         
         <div class="section">
@@ -475,7 +475,7 @@
             
             <h3>L'astuce de la "Vectorisation Unique"</h3>
             <ul>
-                <li><strong>Une seule fois pour l'événement :</strong> Lorsqu'un événement est détecté, l'IA l'analyse <em>une seule fois pour toute sa durée de vie</em> et le transforme en coordonnées (vecteur). Impact : 0,1 à 0,2 g de CO2.</li>
+                <li><strong>Une seule fois pour l'événement :</strong> Lorsqu'un événement est détecté, l'IA l'analyse <em>une seule fois pour toute sa durée de vie</em> et le transform en coordonnées (vecteur). Impact : 0,1 à 0,2 g de CO2.</li>
                 <li><strong>Un calcul basique à la recherche :</strong> Quand vous tapez votre envie, on la vectorise en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste est un simple calcul de distance en base de données PostgreSQL.</li>
             </ul>
 
@@ -633,8 +633,11 @@
             resultsDiv.innerHTML = '';
 
             if (data.recommendations && data.recommendations.length > 0) {
-                const topResultId = data.recommendations[0].identifiant;
-                if (topResultId === 'honeypot_resto' || topResultId === 'honeypot_bar') {
+                const hasHoneypot = data.recommendations.some(rec => 
+                    rec.identifiant === 'honeypot_resto' || rec.identifiant === 'honeypot_bar'
+                );
+
+                if (hasHoneypot) {
                     resultsDiv.innerHTML = `
                         <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
                             <h2 style="color: #1e3a8a; margin-top: 0; font-size: 22px; margin-bottom: 15px;">Envie de vous régaler ou de trinquer ? 😊 🍔🍻</h2>
@@ -644,12 +647,11 @@
                             </p>
                         </div>
                     `;
-                    return; 
                 }
+
                 allRecommendations = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
             }
 
-            // On crée directement le conteneur des cartes sans ajouter la phrase d'intro
             const cardsContainer = document.createElement('div');
             cardsContainer.id = 'cards-container';
             resultsDiv.appendChild(cardsContainer);
@@ -657,8 +659,7 @@
             if (allRecommendations.length > 0) {
                 renderNextBatch();
             } else {
-                // Message propre si aucun résultat n'est retourné
-                resultsDiv.innerHTML = `<p style="text-align: center; color: var(--text-muted); font-size: 16px; font-weight: 500;">👋 Aucun événement ne correspond à cette recherche.</p>`;
+                cardsContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted); font-size: 16px; font-weight: 500;">👋 Aucun événement ne correspond à cette recherche.</p>`;
             }
         }
 
