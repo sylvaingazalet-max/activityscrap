@@ -12,13 +12,13 @@
     
     <style>
         :root {
-            --primary: #d97706;
-            --primary-hover: #b45309;
-            --bg-color: #f3f4f6;
+            --primary: #e67e22;
+            --primary-hover: #d35400;
+            --bg-color: #f8fafc;
             --card-bg: #ffffff;
-            --text-main: #1f2937;
-            --text-muted: #6b7280;
-            --border-color: #e5e7eb;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
         }
 
         body {
@@ -27,7 +27,7 @@
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
-            padding: 20px 15px;
+            padding: 40px 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -36,29 +36,54 @@
         .container {
             background: var(--card-bg);
             width: 100%;
-            max-width: 600px;
-            padding: 35px 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            max-width: 620px;
+            padding: 35px 35px;
+            border-radius: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 30px -3px rgba(0, 0, 0, 0.08);
             box-sizing: border-box;
         }
 
-        h1 {
-            font-size: 28px;
-            font-weight: 800;
+        /* --- Entête App Compacte (Logo à gauche) --- */
+        .brand-header {
             text-align: center;
-            margin-top: 0;
             margin-bottom: 30px;
+        }
+
+        .brand-title-wrap {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .brand-logo-small {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0;
+            display: flex;
+            align-items: center;
         }
 
         h1 span {
             background: linear-gradient(135deg, #ea580c, #db2777);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        .brand-tagline {
+            font-size: 13.5px;
+            color: var(--text-muted);
+            max-width: 460px;
+            margin: 0 auto;
+            line-height: 1.4;
+            font-weight: 500;
         }
 
         .section {
@@ -68,21 +93,24 @@
         label {
             display: block;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             color: var(--text-main);
-            font-size: 15px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .segmented-control {
             display: flex;
-            background: #f3f4f6;
+            background: #f1f5f9;
             padding: 4px;
-            border-radius: 10px;
+            border-radius: 12px;
             margin-bottom: 15px;
         }
+
         .segmented-control button {
             flex: 1;
-            padding: 10px;
+            padding: 12px;
             border: none;
             background: transparent;
             font-size: 14px;
@@ -90,12 +118,13 @@
             color: var(--text-muted);
             cursor: pointer;
             border-radius: 8px;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         .segmented-control button.active {
             background: white;
-            color: var(--primary);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            color: var(--text-main);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
         .hidden {
@@ -104,25 +133,25 @@
 
         input[type="text"], textarea {
             width: 100%;
-            padding: 14px 16px;
+            padding: 16px;
             border: 1px solid var(--border-color);
-            border-radius: 10px;
+            border-radius: 12px;
             box-sizing: border-box;
-            font-size: 16px;
+            font-size: 15px;
             font-family: inherit;
-            background-color: #f9fafb;
+            background-color: #f8fafc;
             transition: all 0.2s ease;
         }
 
         input[type="text"]:focus, textarea:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: #e67e22;
             background-color: #fff;
-            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+            box-shadow: 0 0 0 4px rgba(230, 126, 34, 0.15);
         }
 
         textarea {
-            height: 120px;
+            height: 110px;
             resize: vertical;
         }
 
@@ -130,28 +159,28 @@
             display: block;
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            background: linear-gradient(135deg, #f39c12, #e67e22);
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 16px;
             font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 6px rgba(234, 88, 12, 0.2);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(230, 126, 34, 0.3);
         }
 
         button.primary-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(234, 88, 12, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
         }
 
         button.primary-btn:active:not(:disabled) {
-            transform: translateY(0);
+            transform: translateY(1px);
         }
 
         button:disabled {
-            background: #d1d5db;
+            background: #cbd5e1;
             box-shadow: none;
             cursor: not-allowed;
         }
@@ -161,10 +190,10 @@
             width: 100%;
             padding: 14px;
             background: #ffffff;
-            color: var(--primary);
-            border: 2px solid var(--primary);
-            border-radius: 10px;
-            font-size: 16px;
+            color: #e67e22;
+            border: 2px solid #e67e22;
+            border-radius: 12px;
+            font-size: 15px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -173,12 +202,12 @@
         }
 
         button.secondary-btn:hover {
-            background: var(--primary);
+            background: #e67e22;
             color: #ffffff;
         }
 
         #status {
-            margin-top: 20px;
+            margin-top: 25px;
             font-size: 15px;
             color: var(--text-muted);
             text-align: center;
@@ -193,29 +222,29 @@
         .event-card {
             background: #fff;
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 16px;
+            padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .event-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.06);
-            border-color: #d1d5db;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.06);
+            border-color: #cbd5e1;
         }
 
         .event-image {
             width: 100%;
             height: 200px;
             object-fit: cover;
-            border-radius: 8px;
+            border-radius: 10px;
             margin-bottom: 15px;
         }
 
         .event-title {
-            margin: 0 0 10px 0;
+            margin: 0 0 12px 0;
             font-size: 20px;
             color: var(--text-main);
             font-weight: 700;
@@ -225,18 +254,18 @@
             font-size: 14px;
             color: var(--text-muted);
             margin-bottom: 15px;
-            background: #f3f4f6;
-            padding: 12px;
-            border-radius: 8px;
+            background: #f8fafc;
+            padding: 14px;
+            border-radius: 10px;
         }
-        
-        .event-meta span { display: block; margin-bottom: 5px; }
+
+        .event-meta span { display: block; margin-bottom: 6px; }
         .event-meta span:last-child { margin-bottom: 0; }
 
         .event-desc {
             margin: 0 0 5px 0;
             font-size: 15px;
-            color: #4b5563;
+            color: #334155;
         }
 
         .event-desc.clamped {
@@ -250,7 +279,7 @@
             display: block;
             background: none;
             border: none;
-            color: var(--primary);
+            color: #e67e22;
             font-weight: 600;
             cursor: pointer;
             padding: 0;
@@ -268,10 +297,11 @@
         .event-link {
             display: inline-block;
             font-size: 15px;
-            color: var(--primary);
+            color: #e67e22;
             font-weight: 600;
             text-decoration: none;
         }
+
         .event-link:hover { text-decoration: underline; }
 
         .loading-spinner {
@@ -280,15 +310,16 @@
             height: 20px;
             border: 3px solid rgba(0,0,0,.1);
             border-radius: 50%;
-            border-top-color: var(--primary);
+            border-top-color: #e67e22;
             animation: spin 0.8s linear infinite;
             margin-right: 10px;
             vertical-align: middle;
         }
+
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .site-footer {
-            margin-top: 25px;
+            margin-top: 30px;
             text-align: center;
             font-size: 13px;
             width: 100%;
@@ -324,7 +355,8 @@
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
             align-items: center;
             justify-content: center;
             z-index: 1000;
@@ -333,12 +365,12 @@
 
         .modal-content {
             background: white;
-            padding: 30px;
-            border-radius: 12px;
+            padding: 35px;
+            border-radius: 16px;
             max-width: 500px;
             width: 100%;
             position: relative;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
             max-height: 90vh;
             overflow-y: auto;
         }
@@ -363,18 +395,26 @@
         .modal-content li { margin-bottom: 8px; }
 
         @media (max-width: 480px) {
-            .container { padding: 25px 20px; }
-            h1 { font-size: 24px; }
+            .container { padding: 30px 20px; border-radius: 16px; }
+            body { padding: 15px 10px; }
+            .brand-title-wrap { gap: 8px; }
+            .brand-logo-small { height: 32px; }
+            h1 { font-size: 22px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🧭 <span>La boussole de Lille</span></h1>
+        <div class="brand-header">
+            <div class="brand-title-wrap">
+                <img src="logo.png" alt="La boussole de Lille" class="brand-logo-small">
+                <h1><span>La boussole de Lille</span></h1>
+            </div>
+            <p class="brand-tagline">Recherche de sorties culturelles et d'événements locaux.</p>
+        </div>
         
         <div class="section">
             <label>Quand voulez-vous sortir ?</label>
-            
             <div class="segmented-control" id="date-tabs">
                 <button type="button" class="active" data-mode="any">Peu importe</button>
                 <button type="button" data-mode="single">Un jour précis</button>
@@ -392,7 +432,7 @@
 
         <div class="section">
             <label for="prompt">De quoi avez-vous envie ?</label>
-            <textarea id="prompt" placeholder="Ex : sortie nature, voir un(e) humoriste,écouter de la musique classique,aller à un concert, exposition pour les enfants, faire du vélo ..."></textarea>
+            <textarea id="prompt" placeholder="Ex : sortie nature, voir un(e) humoriste, écouter de la musique classique, aller à un concert, exposition pour les enfants..."></textarea>
         </div>
         
         <button id="searchBtn" class="primary-btn">C'est parti!</button>
@@ -431,7 +471,7 @@
         <div class="modal-content">
             <button id="closeEcoBtn" class="close-modal">✕</button>
             <h2>La voie logique et écolo</h2>
-            <p>L'IA consomme de l'énergie. L'utiliser pour générer des blocs de texte à chaque recherche (comme un chatbot) est un non-sens écologique. Notre parti pris est <strong>direct et minimaliste</strong>.</p>
+            <p>L'IA affirme une grande consommation d'énergie. L'utiliser pour générer des blocs de texte à chaque recherche (comme un chatbot) est un non-sens écologique. Notre parti pris est <strong>direct et minimaliste</strong>.</p>
             
             <h3>L'astuce de la "Vectorisation Unique"</h3>
             <ul>
@@ -439,7 +479,7 @@
                 <li><strong>Un calcul basique à la recherche :</strong> Quand vous tapez votre envie, on la vectorise en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste est un simple calcul de distance en base de données PostgreSQL.</li>
             </ul>
 
-            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-top: 20px;">
                 <p style="margin: 0; color: var(--text-main);"><strong>En résumé :</strong> La Boussole utilise l'IA uniquement pour comprendre le sens des mots, pas pour bavarder. Ce choix technique (modèle Gemini Flash Lite + PostgreSQL pgvector) permet d'avoir la puissance de l'IA avec une empreinte carbone drastiquement réduite.</p>
             </div>
         </div>
@@ -493,7 +533,6 @@
         }
 
         // --- Logique du formulaire & Calendriers ---
-        
         let currentMode = 'any';
         const tabs = document.querySelectorAll('#date-tabs button');
         const singleContainer = document.getElementById('date-single-container');
@@ -547,7 +586,6 @@
         });
 
         // --- Logique de recherche ---
-        
         const searchBtn = document.getElementById('searchBtn');
         const resultsDiv = document.getElementById('results');
         const statusDiv = document.getElementById('status');
