@@ -10,205 +10,234 @@
     <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/airbnb.css">
     
     <style>
+        /* Importation des polices du design */
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Inter:wght@400;500;600;700&display=swap');
+
         :root {
-            --primary: #e67e22;
-            --primary-hover: #d35400;
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
+            --bg-color: #F5F4F0;
+            --primary-orange: #C7662A;
+            --primary-orange-hover: #b55a23;
+            --tab-bg-active: #EADCD0;
+            --text-dark: #1E1E1E;
+            --text-gray: #8A8885;
+            --text-light-gray: #B0AEA9;
+            --border-color: #D1CAC1;
+            --white: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            line-height: 1.6;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 40px 15px;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .container {
-            background: var(--card-bg);
-            width: 100%;
-            max-width: 620px;
-            padding: 35px 35px;
-            border-radius: 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 30px -3px rgba(0, 0, 0, 0.08);
-            box-sizing: border-box;
-        }
-
-        /* --- Entête App Compacte (Logo à gauche) --- */
-        .brand-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .brand-title-wrap {
-            display: flex;
-            align-items: center;
             justify-content: center;
-            gap: 12px;
-            margin-bottom: 6px;
+            padding: 40px 20px;
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .widget-container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* --- Header --- */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
         .brand-logo-small {
-            height: 40px;
+            height: 44px;
             width: auto;
             object-fit: contain;
+            mix-blend-mode: multiply; /* Rend le fond blanc du logo transparent */
         }
 
-        h1 {
-            font-size: 26px;
-            font-weight: 800;
-            margin: 0;
-            display: flex;
-            align-items: center;
-        }
-
-        h1 span {
-            background: linear-gradient(135deg, #ea580c, #db2777);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .brand-tagline {
-            font-size: 13.5px;
-            color: var(--text-muted);
-            max-width: 460px;
-            margin: 0 auto;
-            line-height: 1.4;
-            font-weight: 500;
-        }
-
-        .section {
-            margin-bottom: 25px;
-        }
-
-        /* Remis en minuscule (sans text-transform) et taille ajustée */
-        label {
+        .header-text h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 28px;
+            color: #1A1A1A;
+            margin-bottom: 4px;
             display: block;
+        }
+
+        .header-text h1 span {
+            color: var(--primary-orange);
+            font-style: italic;
             font-weight: 600;
-            margin-bottom: 10px;
-            color: var(--text-main);
-            font-size: 15px; 
         }
 
-        .segmented-control {
+        .header-text p {
+            color: var(--text-gray);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #E3DFD8;
+            margin: 24px 0;
+        }
+
+        /* --- Form Elements --- */
+        .form-section {
+            margin-bottom: 24px;
+        }
+
+        .section-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        /* Segmented Control (Tabs) */
+        .tabs-container {
             display: flex;
-            background: #f1f5f9;
-            padding: 4px;
+            border: 1px solid var(--border-color);
             border-radius: 12px;
-            margin-bottom: 15px;
+            overflow: hidden;
+            background-color: var(--white);
         }
 
-        .segmented-control button {
+        .tabs-container button {
             flex: 1;
-            padding: 12px;
+            text-align: center;
+            padding: 14px 10px;
+            font-size: 14px;
+            color: var(--text-gray);
+            cursor: pointer;
+            transition: all 0.2s ease;
             border: none;
             background: transparent;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-muted);
-            cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-right: 1px solid var(--border-color);
+            font-family: inherit;
         }
 
-        /* Remis en orange (var(--primary)) pour l'état actif */
-        .segmented-control button.active {
-            background: white;
-            color: var(--primary);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        .tabs-container button:last-child {
+            border-right: none;
+        }
+
+        .tabs-container button.active {
+            background-color: var(--tab-bg-active);
+            color: var(--primary-orange);
+            font-weight: 600;
         }
 
         .hidden {
             display: none !important;
         }
 
+        /* Inputs (Flatpickr) & Textarea */
         input[type="text"], textarea {
             width: 100%;
-            padding: 16px;
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            box-sizing: border-box;
+            padding: 16px;
+            font-family: 'Inter', sans-serif;
             font-size: 15px;
-            font-family: inherit;
-            background-color: #f8fafc;
-            transition: all 0.2s ease;
+            color: var(--text-dark);
+            background-color: var(--white);
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
         }
 
-        input[type="text"]:focus, textarea:focus {
-            outline: none;
-            border-color: #e67e22;
-            background-color: #fff;
-            box-shadow: 0 0 0 4px rgba(230, 126, 34, 0.15);
+        input[type="text"] {
+            margin-top: 12px;
         }
 
         textarea {
-            height: 110px;
-            resize: vertical;
+            height: 120px;
+            resize: none;
         }
 
-        button.primary-btn {
-            display: block;
+        input[type="text"]:focus, textarea:focus {
+            border-color: var(--text-gray);
+        }
+
+        textarea::placeholder, input[type="text"]::placeholder {
+            color: #C0BCB6;
+        }
+
+        /* Submit Button */
+        .submit-btn {
             width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #f39c12, #e67e22);
-            color: white;
+            background-color: var(--primary-orange);
+            color: var(--white);
             border: none;
             border-radius: 12px;
+            padding: 18px;
             font-size: 16px;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 14px rgba(230, 126, 34, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.2s;
+            text-decoration: none;
         }
 
-        button.primary-btn:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
+        .submit-btn:hover:not(:disabled) {
+            background-color: var(--primary-orange-hover);
         }
 
-        button.primary-btn:active:not(:disabled) {
-            transform: translateY(1px);
-        }
-
-        button:disabled {
-            background: #cbd5e1;
-            box-shadow: none;
+        .submit-btn:disabled {
+            background-color: var(--border-color);
             cursor: not-allowed;
         }
 
-        button.secondary-btn {
-            display: block;
-            width: 100%;
-            padding: 14px;
-            background: #ffffff;
-            color: #e67e22;
-            border: 2px solid #e67e22;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: 600;
+        .submit-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* --- Footer --- */
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links button, .footer-links a {
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            text-decoration: none;
+            font-size: 14px;
+            font-family: inherit;
             cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 10px;
-            margin-bottom: 20px;
+            transition: color 0.2s;
+            padding: 0;
         }
 
-        button.secondary-btn:hover {
-            background: #e67e22;
-            color: #ffffff;
+        .footer-links button:hover, .footer-links a:hover {
+            color: var(--text-dark);
         }
 
+        /* --- Dynamic Elements (Results, Loaders, Modals) --- */
         #status {
             margin-top: 25px;
             font-size: 15px;
-            color: var(--text-muted);
+            color: var(--text-gray);
             text-align: center;
             font-weight: 500;
         }
@@ -219,7 +248,7 @@
         }
 
         .event-card {
-            background: #fff;
+            background: var(--white);
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 24px;
@@ -231,7 +260,7 @@
         .event-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 12px 24px rgba(0,0,0,0.06);
-            border-color: #cbd5e1;
+            border-color: var(--text-gray);
         }
 
         .event-image {
@@ -245,15 +274,16 @@
         .event-title {
             margin: 0 0 12px 0;
             font-size: 20px;
-            color: var(--text-main);
+            color: var(--text-dark);
             font-weight: 700;
+            font-family: 'Playfair Display', serif;
         }
 
         .event-meta {
             font-size: 14px;
-            color: var(--text-muted);
+            color: var(--text-gray);
             margin-bottom: 15px;
-            background: #f8fafc;
+            background: var(--bg-color);
             padding: 14px;
             border-radius: 10px;
         }
@@ -264,7 +294,7 @@
         .event-desc {
             margin: 0 0 5px 0;
             font-size: 15px;
-            color: #334155;
+            color: var(--text-dark);
         }
 
         .event-desc.clamped {
@@ -278,7 +308,7 @@
             display: block;
             background: none;
             border: none;
-            color: #e67e22;
+            color: var(--primary-orange);
             font-weight: 600;
             cursor: pointer;
             padding: 0;
@@ -286,22 +316,48 @@
             font-size: 14px;
             transition: color 0.2s;
             text-align: left;
+            font-family: inherit;
         }
 
         .read-more-btn:hover {
             text-decoration: underline;
-            color: var(--primary-hover);
+            color: var(--primary-orange-hover);
         }
 
         .event-link {
             display: inline-block;
             font-size: 15px;
-            color: #e67e22;
+            color: var(--primary-orange);
             font-weight: 600;
             text-decoration: none;
         }
 
         .event-link:hover { text-decoration: underline; }
+
+        .secondary-btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 14px;
+            background: var(--white);
+            color: var(--primary-orange);
+            border: 2px solid var(--primary-orange);
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            text-decoration: none;
+        }
+
+        .secondary-btn:hover {
+            background: var(--primary-orange);
+            color: var(--white);
+        }
 
         .loading-spinner {
             display: inline-block;
@@ -309,7 +365,7 @@
             height: 20px;
             border: 3px solid rgba(0,0,0,.1);
             border-radius: 50%;
-            border-top-color: #e67e22;
+            border-top-color: var(--primary-orange);
             animation: spin 0.8s linear infinite;
             margin-right: 10px;
             vertical-align: middle;
@@ -317,44 +373,12 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .site-footer {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 13px;
-            width: 100%;
-            max-width: 600px;
-            color: var(--text-muted);
-        }
-
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .site-footer button, .site-footer a {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 0;
-            font-family: inherit;
-            font-size: 13px;
-            text-decoration: none;
-            transition: color 0.2s ease;
-        }
-
-        .site-footer button:hover, .site-footer a:hover {
-            color: var(--text-main);
-            text-decoration: underline;
-        }
-
+        /* Modals */
         .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(15, 23, 42, 0.4);
+            background: rgba(30, 30, 30, 0.5);
             backdrop-filter: blur(4px);
             align-items: center;
             justify-content: center;
@@ -363,7 +387,7 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--white);
             padding: 35px;
             border-radius: 16px;
             max-width: 500px;
@@ -382,425 +406,469 @@
             border: none;
             font-size: 20px;
             cursor: pointer;
-            color: var(--text-muted);
+            color: var(--text-gray);
         }
 
-        .close-modal:hover { color: var(--text-main); }
+        .close-modal:hover { color: var(--text-dark); }
 
-        .modal-content h2 { margin-top: 0; font-size: 22px; color: var(--text-main); }
-        .modal-content h3 { font-size: 16px; margin-bottom: 8px; color: var(--text-main); margin-top: 20px; }
-        .modal-content p, .modal-content li { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+        .modal-content h2 { margin-top: 0; font-size: 24px; color: var(--text-dark); font-family: 'Playfair Display', serif; }
+        .modal-content h3 { font-size: 16px; margin-bottom: 8px; color: var(--text-dark); margin-top: 20px; }
+        .modal-content p, .modal-content li { font-size: 14px; color: var(--text-gray); line-height: 1.6; }
         .modal-content ul { padding-left: 20px; margin-top: 5px; }
         .modal-content li { margin-bottom: 8px; }
+        .modal-content strong { color: var(--text-dark); }
+        
+        .modal-content a.profile-link {
+            color: var(--primary-orange);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .modal-content a.profile-link:hover {
+            text-decoration: underline;
+        }
 
-        @media (max-width: 480px) {
-            .container { padding: 30px 20px; border-radius: 16px; }
-            body { padding: 15px 10px; }
-            .brand-title-wrap { gap: 8px; }
-            .brand-logo-small { height: 32px; }
-            h1 { font-size: 22px; }
+        /* Contact minimal links */
+        .contact-link {
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .contact-link-secondary {
+            color: var(--text-dark);
+        }
+        .contact-link-secondary:hover {
+            color: var(--text-gray);
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="brand-header">
-            <div class="brand-title-wrap">
-                <img src="logo.png" alt="La boussole de Lille" class="brand-logo-small">
-                <h1><span>La boussole de Lille</span></h1>
-            </div>
-            <p class="brand-tagline">Recherche de sorties culturelles et d'événements locaux.</p>
+
+<div class="widget-container">
+    
+    <header class="header">
+        <img src="logo.png" alt="La boussole de Lille" class="brand-logo-small">
+
+        <div class="header-text">
+            <h1>La boussole de <span>Lille</span></h1>
+            <p>Sorties culturelles & événements locaux</p>
         </div>
+    </header>
+
+    <hr>
+
+    <div class="form-section">
+        <span class="section-label">Quand ?</span>
+        <div class="tabs-container" id="date-tabs">
+            <button type="button" class="active" data-mode="any">Peu importe</button>
+            <button type="button" data-mode="single">Un jour précis</button>
+            <button type="button" data-mode="range">Une période</button>
+        </div>
+
+        <div id="date-single-container" class="hidden">
+            <input type="text" id="dateSingle" placeholder="Sélectionnez une date...">
+        </div>
+
+        <div id="date-range-container" class="hidden">
+            <input type="text" id="dateRange" placeholder="Sélectionnez vos dates...">
+        </div>
+    </div>
+
+    <div class="form-section">
+        <label for="prompt" class="section-label">Qu'est-ce qui vous tente ?</label>
+        <textarea id="prompt" placeholder="Ex : concert de jazz, humoriste, sortie nature avec enfants, exposition originale..."></textarea>
+    </div>
+
+    <button id="searchBtn" class="submit-btn">
+        Trouver une sortie
+        <svg viewBox="0 0 24 24">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+    </button>
+
+    <div id="status"></div>
+    <div id="results"></div>
+
+    <hr>
+
+    <div class="footer-links">
+        <button id="openHowBtn">Pourquoi nous ?</button>
+        <button id="openEcoBtn">Logique & Impact</button>
+        <button id="openLegalBtn">Mentions légales</button>
+        <button id="openContactBtn">Contact</button>
+    </div>
+
+</div>
+
+<div id="howModal" class="modal-overlay">
+    <div class="modal-content">
+        <button id="closeHowBtn" class="close-modal">✕</button>
+        <h2>Pourquoi La Boussole ?</h2>
         
-        <div class="section">
-            <label>Quand voulez-vous sortir ?</label>
-            <div class="segmented-control" id="date-tabs">
-                <button type="button" class="active" data-mode="any">Peu importe</button>
-                <button type="button" data-mode="single">Un jour précis</button>
-                <button type="button" data-mode="range">Une période</button>
-            </div>
+        <h3>Mieux qu'un LLM classique (ex: ChatGPT)</h3>
+        <p>Une IA conversationnelle est subjective : elle fait des choix à votre place, propose souvent les mêmes lieux mainstream, et hallucine parfois les horaires. <strong>Ici, l'IA ne prend aucune décision.</strong> Elle fait de la pure analyse sémantique : elle convertit votre envie en coordonnées mathématiques et trouve les événements locaux qui en sont factuellement les plus proches. Zéro filtre, 100% de pertinence.</p>
 
-            <div id="date-single-container" class="hidden">
-                <input type="text" id="dateSingle" placeholder="Sélectionnez une date...">
-            </div>
+        <h3>Une base de données hyper-exhaustive</h3>
+        <p>Nous aspirons et agrégeons en continu les données d'une multitude de sources pour ne rien rater, du grand festival au petit atelier de quartier :</p>
+        <ul>
+            <li><strong>OpenAgenda :</strong> Incluant les données officielles de la Mairie de Lille et des dizaines de petits agendas associatifs locaux.</li>
+            <li><strong>DataTourisme :</strong> La base de données nationale des offices de tourisme.</li>
+            <li><strong>Ticketmaster & Eventbrite :</strong> Pour ne rater aucun concert, spectacle ou atelier indépendant.</li>
+        </ul>
+    </div>
+</div>
 
-            <div id="date-range-container" class="hidden">
-                <input type="text" id="dateRange" placeholder="Sélectionnez vos dates...">
-            </div>
-        </div>
-
-        <div class="section">
-            <label for="prompt">De quoi avez-vous envie ?</label>
-            <textarea id="prompt" placeholder="Ex : sortie nature, voir un(e) humoriste, écouter de la musique classique, aller à un concert, exposition pour les enfants..."></textarea>
-        </div>
+<div id="ecoModal" class="modal-overlay">
+    <div class="modal-content">
+        <button id="closeEcoBtn" class="close-modal">✕</button>
+        <h2>La voie logique et écolo</h2>
+        <p>L'IA affirme une grande consommation d'énergie. L'utiliser pour générer des blocs de texte à chaque recherche (comme un chatbot) est un non-sens écologique. Notre parti pris est <strong>direct et minimaliste</strong>.</p>
         
-        <button id="searchBtn" class="primary-btn">C'est parti!</button>
-        <div id="status"></div>
-        <div id="results"></div>
-    </div>
+        <h3>L'astuce de la "Vectorisation Unique"</h3>
+        <ul>
+            <li><strong>Une seule fois pour l'événement :</strong> Lorsqu'un événement est détecté, l'IA l'analyse <em>une seule fois pour toute sa durée de vie</em> et le transforme en coordonnées (vecteur). Impact : 0,1 à 0,2 g de CO2.</li>
+            <li><strong>Un calcul basique à la recherche :</strong> Quand vous tapez votre envie, on la vectorise en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste est un simple calcul de distance en base de données PostgreSQL.</li>
+        </ul>
 
-    <footer class="site-footer">
-        <div class="footer-links">
-            <button id="openHowBtn">Pourquoi nous ?</button>
-            <button id="openEcoBtn">Logique & Impact</button>
-            <button id="openLegalBtn">Mentions légales</button>
-            <a href="mailto:laboussoledelille@proton.me">Contact</a>
+        <div style="background: var(--tab-bg-active); padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <p style="margin: 0; color: var(--text-dark);"><strong>En résumé :</strong> La Boussole utilise l'IA uniquement pour comprendre le sens des mots, pas pour bavarder. Ce choix technique (modèle Gemini Flash Lite + PostgreSQL pgvector) permet d'avoir la puissance de l'IA avec une empreinte carbone drastiquement réduite.</p>
         </div>
-    </footer>
+    </div>
+</div>
 
-    <div id="howModal" class="modal-overlay">
-        <div class="modal-content">
-            <button id="closeHowBtn" class="close-modal">✕</button>
-            <h2>Pourquoi La Boussole ?</h2>
+<div id="legalModal" class="modal-overlay">
+    <div class="modal-content">
+        <button id="closeLegalBtn" class="close-modal">✕</button>
+        <h2>Mentions légales</h2>
+        
+        <h3>Éditeur du site</h3>
+        <p>Ce site est édité à titre personnel par <a href="https://www.linkedin.com/in/sylvain-gazalet-960979aa" target="_blank" rel="noopener noreferrer" class="profile-link">Sylvain Gazalet</a>.</p>
+
+        <h3>Hébergement</h3>
+        <p>Ce site est hébergé par Vercel Inc.<br>
+        440 N Barranca Ave #4133<br>
+        Covina, CA 91723, États-Unis<br>
+        Contact : privacy@vercel.com</p>
+    </div>
+</div>
+
+<div id="contactModal" class="modal-overlay">
+    <div class="modal-content" style="text-align: center;">
+        <button id="closeContactBtn" class="close-modal">✕</button>
+        <h2>Contact</h2>
+        
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; margin-top: 25px;">
+            <a href="https://www.linkedin.com/in/sylvain-gazalet-960979aa" target="_blank" rel="noopener noreferrer" class="contact-link contact-link-secondary">
+                Discuter sur LinkedIn ↗
+            </a>
             
-            <h3>Mieux qu'un LLM classique (ex: ChatGPT)</h3>
-            <p>Une IA conversationnelle est subjective : elle fait des choix à votre place, propose souvent les mêmes lieux mainstream, et hallucine parfois les horaires. <strong>Ici, l'IA ne prend aucune décision.</strong> Elle fait de la pure analyse sémantique : elle convertit votre envie en coordonnées mathématiques et trouve les événements locaux qui en sont factuellement les plus proches. Zéro filtre, 100% de pertinence.</p>
-
-            <h3>Une base de données hyper-exhaustive</h3>
-            <p>Nous aspirons et agrégeons en continu les données d'une multitude de sources pour ne rien rater, du grand festival au petit atelier de quartier :</p>
-            <ul>
-                <li><strong>OpenAgenda :</strong> Incluant les données officielles de la Mairie de Lille et des dizaines de petits agendas associatifs locaux.</li>
-                <li><strong>DataTourisme :</strong> La base de données nationale des offices de tourisme.</li>
-                <li><strong>Ticketmaster & Eventbrite :</strong> Pour ne rater aucun concert, spectacle ou atelier indépendant.</li>
-            </ul>
+            <a href="mailto:laboussoledelille@proton.me" class="contact-link contact-link-secondary">
+                M'envoyer un email ↗
+            </a>
         </div>
     </div>
+</div>
 
-    <div id="ecoModal" class="modal-overlay">
-        <div class="modal-content">
-            <button id="closeEcoBtn" class="close-modal">✕</button>
-            <h2>La voie logique et écolo</h2>
-            <p>L'IA affirme une grande consommation d'énergie. L'utiliser pour générer des blocs de texte à chaque recherche (comme un chatbot) est un non-sens écologique. Notre parti pris est <strong>direct et minimaliste</strong>.</p>
-            
-            <h3>L'astuce de la "Vectorisation Unique"</h3>
-            <ul>
-                <li><strong>Une seule fois pour l'événement :</strong> Lorsqu'un événement est détecté, l'IA l'analyse <em>une seule fois pour toute sa durée de vie</em> et le transform en coordonnées (vecteur). Impact : 0,1 à 0,2 g de CO2.</li>
-                <li><strong>Un calcul basique à la recherche :</strong> Quand vous tapez votre envie, on la vectorise en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste est un simple calcul de distance en base de données PostgreSQL.</li>
-            </ul>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
 
-            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                <p style="margin: 0; color: var(--text-main);"><strong>En résumé :</strong> La Boussole utilise l'IA uniquement pour comprendre le sens des mots, pas pour bavarder. Ce choix technique (modèle Gemini Flash Lite + PostgreSQL pgvector) permet d'avoir la puissance de l'IA avec une empreinte carbone drastiquement réduite.</p>
-            </div>
-        </div>
-    </div>
-
-    <div id="legalModal" class="modal-overlay">
-        <div class="modal-content">
-            <button id="closeLegalBtn" class="close-modal">✕</button>
-            <h2>Mentions légales</h2>
-            
-            <h3>Éditeur du site</h3>
-            <p>Ce site est édité à titre personnel par Sylvain Gazalet.</p>
-
-            <h3>Hébergement</h3>
-            <p>Ce site est hébergé par Vercel Inc.<br>
-            440 N Barranca Ave #4133<br>
-            Covina, CA 91723, États-Unis<br>
-            Contact : privacy@vercel.com</p>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://npmcdn.com/flatpickr/dist/l10n/fr.js"></script>
-
-    <script>
-        // --- Réveil anti "Cold Start" ---
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible") {
-                fetch('/api/gemini', { method: 'HEAD' }).catch(() => {});
-            }
-        });
-
-        // --- Gestion des modales ---
-        function setupModal(modalId, openBtnId, closeBtnId) {
-            const modal = document.getElementById(modalId);
-            document.getElementById(openBtnId).onclick = () => modal.style.display = 'flex';
-            document.getElementById(closeBtnId).onclick = () => modal.style.display = 'none';
-            return modal;
+<script>
+    // --- Réveil anti "Cold Start" ---
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            fetch('/api/gemini', { method: 'HEAD' }).catch(() => {});
         }
+    });
 
-        const modals = [
-            setupModal('legalModal', 'openLegalBtn', 'closeLegalBtn'),
-            setupModal('howModal', 'openHowBtn', 'closeHowBtn'),
-            setupModal('ecoModal', 'openEcoBtn', 'closeEcoBtn')
-        ];
+    // --- Gestion des modales ---
+    function setupModal(modalId, openBtnId, closeBtnId) {
+        const modal = document.getElementById(modalId);
+        document.getElementById(openBtnId).onclick = () => modal.style.display = 'flex';
+        document.getElementById(closeBtnId).onclick = () => modal.style.display = 'none';
+        return modal;
+    }
 
-        window.onclick = (e) => {
-            modals.forEach(modal => {
-                if (e.target === modal) modal.style.display = 'none';
-            });
-        }
+    const modals = [
+        setupModal('legalModal', 'openLegalBtn', 'closeLegalBtn'),
+        setupModal('howModal', 'openHowBtn', 'closeHowBtn'),
+        setupModal('ecoModal', 'openEcoBtn', 'closeEcoBtn'),
+        setupModal('contactModal', 'openContactBtn', 'closeContactBtn')
+    ];
 
-        // --- Logique du formulaire & Calendriers ---
-        let currentMode = 'any';
-        const tabs = document.querySelectorAll('#date-tabs button');
-        const singleContainer = document.getElementById('date-single-container');
-        const rangeContainer = document.getElementById('date-range-container');
-
-        const fpConfig = {
-            locale: "fr",
-            minDate: "today",
-            dateFormat: "Y-m-d",
-            altInput: true,
-            altFormat: "j F Y",
-            disableMobile: true // <-- Ajout pour empêcher le bug sur iOS
-        };
-
-        const fpSingle = flatpickr("#dateSingle", fpConfig);
-
-        const fpRange = flatpickr("#dateRange", {
-            ...fpConfig,
-            mode: "range"
+    window.onclick = (e) => {
+        modals.forEach(modal => {
+            if (e.target === modal) modal.style.display = 'none';
         });
+    }
 
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
+    // --- Logique du formulaire & Calendriers ---
+    let currentMode = 'any';
+    const tabs = document.querySelectorAll('#date-tabs button');
+    const singleContainer = document.getElementById('date-single-container');
+    const rangeContainer = document.getElementById('date-range-container');
+
+    const fpConfig = {
+        locale: "fr",
+        minDate: "today",
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "j F Y",
+        disableMobile: true 
+    };
+
+    const fpSingle = flatpickr("#dateSingle", fpConfig);
+
+    const fpRange = flatpickr("#dateRange", {
+        ...fpConfig,
+        mode: "range"
+    });
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            currentMode = tab.dataset.mode;
+
+            if (currentMode === 'any') {
+                singleContainer.classList.add('hidden');
+                rangeContainer.classList.add('hidden');
+            } else if (currentMode === 'single') {
+                singleContainer.classList.remove('hidden');
+                rangeContainer.classList.add('hidden');
                 
-                currentMode = tab.dataset.mode;
+                setTimeout(() => { fpSingle.open(); }, 50);
 
-                if (currentMode === 'any') {
-                    singleContainer.classList.add('hidden');
-                    rangeContainer.classList.add('hidden');
-                } else if (currentMode === 'single') {
-                    singleContainer.classList.remove('hidden');
-                    rangeContainer.classList.add('hidden');
-                    
-                    // Ouverture automatique du calendrier Single
-                    setTimeout(() => {
-                        fpSingle.open();
-                    }, 50);
-
-                } else if (currentMode === 'range') {
-                    singleContainer.classList.add('hidden');
-                    rangeContainer.classList.remove('hidden');
-                    
-                    // Ouverture automatique du calendrier Range
-                    setTimeout(() => {
-                        fpRange.open();
-                    }, 50);
-                }
-            });
-        });
-
-        // --- Logique de recherche ---
-        const searchBtn = document.getElementById('searchBtn');
-        const resultsDiv = document.getElementById('results');
-        const statusDiv = document.getElementById('status');
-
-        let allRecommendations = [];
-        let visibleCount = 0;
-        const BATCH_SIZE = 3;
-
-        function createCardHtml(rec) {
-            const imageHtml = rec.image_url 
-                ? `<img src="${rec.image_url}" alt="${rec.titre}" class="event-image">` 
-                : '';
-
-            const chapo = rec.chapo || '';
-            const descId = 'desc-' + Math.random().toString(36).substr(2, 9);
-            let descHtml = '';
-            
-            if (chapo.length > 180) {
-                descHtml = `
-                    <p class="event-desc clamped" id="${descId}">${chapo}</p>
-                    <button class="read-more-btn" onclick="document.getElementById('${descId}').classList.remove('clamped'); this.remove();">Lire la suite...</button>
-                `;
-            } else {
-                descHtml = `<p class="event-desc" style="margin-bottom: 15px;">${chapo}</p>`;
-            }
-
-            return `
-                <div class="event-card">
-                    ${imageHtml}
-                    <h3 class="event-title">${rec.titre}</h3>
-                    <div class="event-meta">
-                        <span>📍 <strong>Lieu :</strong> ${rec.lieu}</span>
-                        <span>📅 <strong>Quand :</strong> ${rec.date_horaire}</span>
-                        <span>💶 <strong>Tarif :</strong> ${rec.tarif}</span>
-                    </div>
-                    ${descHtml}
-                    ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" class="event-link">En savoir plus / Réserver →</a>` : ''}
-                </div>
-            `;
-        }
-
-        function renderEvents(data) {
-            allRecommendations = [];
-            visibleCount = 0;
-            resultsDiv.innerHTML = '';
-
-            if (data.recommendations && data.recommendations.length > 0) {
-                const hasHoneypot = data.recommendations.some(rec => 
-                    rec.identifiant === 'honeypot_resto' || rec.identifiant === 'honeypot_bar'
-                );
-
-                if (hasHoneypot) {
-                    resultsDiv.innerHTML = `
-                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
-                            <h2 style="color: #1e3a8a; margin-top: 0; font-size: 22px; margin-bottom: 15px;">Envie de vous régaler ou de trinquer ? 😊 🍔🍻</h2>
-                            <p style="color: #1d4ed8; font-size: 15px; margin-bottom: 0; font-weight: 500; line-height: 1.6;">
-                                La boussole de Lille se concentre exclusivement sur les <strong>événements ponctuels et les sorties culturelles</strong>.<br><br>
-                                Pour dénicher les meilleures adresses, les guides locaux classiques seront de bien meilleurs alliés !
-                            </p>
-                        </div>
-                    `;
-                }
-
-                allRecommendations = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
-            }
-
-            const cardsContainer = document.createElement('div');
-            cardsContainer.id = 'cards-container';
-            resultsDiv.appendChild(cardsContainer);
-
-            if (allRecommendations.length > 0) {
-                renderNextBatch();
-            } else {
-                cardsContainer.innerHTML = `<p style="text-align: center; color: var(--text-muted); font-size: 16px; font-weight: 500;">👋 Aucun événement ne correspond à cette recherche.</p>`;
-            }
-        }
-
-        function renderNextBatch() {
-            const cardsContainer = document.getElementById('cards-container');
-            const nextBatch = allRecommendations.slice(visibleCount, visibleCount + BATCH_SIZE);
-            
-            let batchHtml = '';
-            nextBatch.forEach(rec => {
-                batchHtml += createCardHtml(rec);
-            });
-            
-            cardsContainer.insertAdjacentHTML('beforeend', batchHtml);
-            visibleCount += nextBatch.length;
-            
-            let loadMoreBtn = document.getElementById('loadMoreBtn');
-            
-            if (visibleCount < allRecommendations.length) {
-                if (!loadMoreBtn) {
-                    loadMoreBtn = document.createElement('button');
-                    loadMoreBtn.id = 'loadMoreBtn';
-                    loadMoreBtn.className = 'secondary-btn';
-                    loadMoreBtn.innerHTML = 'Voir plus de sorties 👇';
-                    loadMoreBtn.onclick = renderNextBatch;
-                    resultsDiv.appendChild(loadMoreBtn);
-                }
-            } else {
-                if (loadMoreBtn) {
-                    loadMoreBtn.remove();
-                }
-            }
-        }
-
-        // --- Fonction de Retry (Tentative automatique) ---
-        async function fetchWithRetry(url, options, retries = 1) {
-            try {
-                return await fetch(url, options);
-            } catch (err) {
-                if (retries > 0) {
-                    console.log("Connexion échouée, tentative de réveil du serveur...");
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    return fetchWithRetry(url, options, retries - 1);
-                }
-                throw err;
-            }
-        }
-
-        searchBtn.onclick = async () => {
-            const prompt = document.getElementById('prompt').value.trim();
-            if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
-            
-            let startDate = "";
-            let endDate = "";
-            
-            if (currentMode === 'single') {
-                if (fpSingle.selectedDates.length > 0) {
-                    startDate = flatpickr.formatDate(fpSingle.selectedDates[0], "Y-m-d");
-                    endDate = startDate; 
-                }
             } else if (currentMode === 'range') {
-                if (fpRange.selectedDates.length > 0) {
-                    startDate = flatpickr.formatDate(fpRange.selectedDates[0], "Y-m-d");
-                    endDate = fpRange.selectedDates[1] 
-                        ? flatpickr.formatDate(fpRange.selectedDates[1], "Y-m-d") 
-                        : startDate;
-                }
+                singleContainer.classList.add('hidden');
+                rangeContainer.classList.remove('hidden');
+                
+                setTimeout(() => { fpRange.open(); }, 50);
+            }
+        });
+    });
+
+    // --- Logique de recherche ---
+    const searchBtn = document.getElementById('searchBtn');
+    const resultsDiv = document.getElementById('results');
+    const statusDiv = document.getElementById('status');
+
+    let allRecommendations = [];
+    let visibleCount = 0;
+    const BATCH_SIZE = 3;
+
+    function createCardHtml(rec) {
+        const imageHtml = rec.image_url 
+            ? `<img src="${rec.image_url}" alt="${rec.titre}" class="event-image">` 
+            : '';
+
+        const chapo = rec.chapo || '';
+        const descId = 'desc-' + Math.random().toString(36).substr(2, 9);
+        let descHtml = '';
+        
+        if (chapo.length > 180) {
+            descHtml = `
+                <p class="event-desc clamped" id="${descId}">${chapo}</p>
+                <button class="read-more-btn" onclick="document.getElementById('${descId}').classList.remove('clamped'); this.remove();">Lire la suite...</button>
+            `;
+        } else {
+            descHtml = `<p class="event-desc" style="margin-bottom: 15px;">${chapo}</p>`;
+        }
+
+        return `
+            <div class="event-card">
+                ${imageHtml}
+                <h3 class="event-title">${rec.titre}</h3>
+                <div class="event-meta">
+                    <span>📍 <strong>Lieu :</strong> ${rec.lieu}</span>
+                    <span>📅 <strong>Quand :</strong> ${rec.date_horaire}</span>
+                    <span>💶 <strong>Tarif :</strong> ${rec.tarif}</span>
+                </div>
+                ${descHtml}
+                ${rec.url_reservation ? `<a href="${rec.url_reservation}" target="_blank" class="event-link">En savoir plus / Réserver →</a>` : ''}
+            </div>
+        `;
+    }
+
+    function renderEvents(data) {
+        allRecommendations = [];
+        visibleCount = 0;
+        resultsDiv.innerHTML = '';
+
+        if (data.recommendations && data.recommendations.length > 0) {
+            const hasHoneypot = data.recommendations.some(rec => 
+            (rec.identifiant === 'honeypot_resto' || rec.identifiant === 'honeypot_bar') &&
+            rec.distance_debug < 0.32);
+
+            if (hasHoneypot) {
+                resultsDiv.innerHTML = `
+                    <div style="background: var(--tab-bg-active); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; text-align: center; margin-bottom: 20px;">
+                        <h2 style="color: var(--primary-orange); margin-top: 0; font-size: 22px; margin-bottom: 15px;">Envie de vous régaler ou de trinquer ? 😊 🍔🍻</h2>
+                        <p style="color: var(--text-dark); font-size: 15px; margin-bottom: 0; font-weight: 500; line-height: 1.6;">
+                            La boussole de Lille se concentre exclusivement sur les <strong>événements ponctuels et les sorties culturelles</strong>.<br><br>
+                            Pour dénicher les meilleures adresses, les guides locaux classiques seront de bien meilleurs alliés !
+                        </p>
+                    </div>
+                `;
             }
 
-            searchBtn.disabled = true;
-            resultsDiv.style.display = 'none';
-            resultsDiv.innerHTML = '';
-            statusDiv.innerHTML = '<div class="loading-spinner"></div> Recherche des meilleures sorties en cours...';
+            allRecommendations = data.recommendations.filter(rec => !rec.identifiant.startsWith('honeypot_'));
+        }
 
-            try {
-                // Utilisation de notre nouvelle fonction fetchWithRetry ici
-                const response = await fetchWithRetry('/api/gemini', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, startDate, endDate })
-                });
+        const cardsContainer = document.createElement('div');
+        cardsContainer.id = 'cards-container';
+        resultsDiv.appendChild(cardsContainer);
 
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        throw new Error("EXPIRED_SESSION");
-                    }
-                    throw new Error(`Erreur HTTP: ${response.status}`);
+        if (allRecommendations.length > 0) {
+            renderNextBatch();
+        } else {
+            cardsContainer.innerHTML = `<p style="text-align: center; color: var(--text-gray); font-size: 16px; font-weight: 500;">👋 Aucun événement ne correspond à cette recherche.</p>`;
+        }
+    }
+
+    function renderNextBatch() {
+        const cardsContainer = document.getElementById('cards-container');
+        const nextBatch = allRecommendations.slice(visibleCount, visibleCount + BATCH_SIZE);
+        
+        let batchHtml = '';
+        nextBatch.forEach(rec => {
+            batchHtml += createCardHtml(rec);
+        });
+        
+        cardsContainer.insertAdjacentHTML('beforeend', batchHtml);
+        visibleCount += nextBatch.length;
+        
+        let loadMoreBtn = document.getElementById('loadMoreBtn');
+        
+        if (visibleCount < allRecommendations.length) {
+            if (!loadMoreBtn) {
+                loadMoreBtn = document.createElement('button');
+                loadMoreBtn.id = 'loadMoreBtn';
+                loadMoreBtn.className = 'secondary-btn';
+                loadMoreBtn.innerHTML = 'Voir plus de sorties 👇';
+                loadMoreBtn.onclick = renderNextBatch;
+                resultsDiv.appendChild(loadMoreBtn);
+            }
+        } else {
+            if (loadMoreBtn) {
+                loadMoreBtn.remove();
+            }
+        }
+    }
+
+    async function fetchWithRetry(url, options, retries = 1) {
+        try {
+            return await fetch(url, options);
+        } catch (err) {
+            if (retries > 0) {
+                console.log("Connexion échouée, tentative de réveil du serveur...");
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return fetchWithRetry(url, options, retries - 1);
+            }
+            throw err;
+        }
+    }
+
+    searchBtn.onclick = async () => {
+        const prompt = document.getElementById('prompt').value.trim();
+        if (!prompt) return alert("Veuillez saisir ce que vous souhaitez faire.");
+        
+        let startDate = "";
+        let endDate = "";
+        
+        if (currentMode === 'single') {
+            if (fpSingle.selectedDates.length > 0) {
+                startDate = flatpickr.formatDate(fpSingle.selectedDates[0], "Y-m-d");
+                endDate = startDate; 
+            }
+        } else if (currentMode === 'range') {
+            if (fpRange.selectedDates.length > 0) {
+                startDate = flatpickr.formatDate(fpRange.selectedDates[0], "Y-m-d");
+                endDate = fpRange.selectedDates[1] 
+                    ? flatpickr.formatDate(fpRange.selectedDates[1], "Y-m-d") 
+                    : startDate;
+            }
+        }
+
+        searchBtn.disabled = true;
+        resultsDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+        statusDiv.innerHTML = '<div class="loading-spinner"></div> Recherche des meilleures sorties en cours...';
+
+        try {
+            const response = await fetchWithRetry('/api/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, startDate, endDate })
+            });
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error("EXPIRED_SESSION");
                 }
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
 
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        if (!trimmedLine) continue;
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) continue;
 
-                        if (trimmedLine.startsWith('data: ')) {
-                            const dataStr = trimmedLine.substring(6).trim();
-                            try {
-                                const event = JSON.parse(dataStr);
-                                if (event.type === 'progress') {
-                                    statusDiv.innerHTML = `<div class="loading-spinner"></div> ${event.data.message}`;
-                                } else if (event.type === 'result') {
-                                    statusDiv.textContent = '';
-                                    resultsDiv.style.display = 'block';
-                                    renderEvents(event.data.result);
-                                } else if (event.type === 'error') {
-                                    statusDiv.textContent = '❌ Erreur : ' + event.data.error;
-                                }
-                            } catch (parseErr) {
-                                console.error('Erreur de parsing:', parseErr);
+                    if (trimmedLine.startsWith('data: ')) {
+                        const dataStr = trimmedLine.substring(6).trim();
+                        try {
+                            const event = JSON.parse(dataStr);
+                            if (event.type === 'progress') {
+                                statusDiv.innerHTML = `<div class="loading-spinner"></div> ${event.data.message}`;
+                            } else if (event.type === 'result') {
+                                statusDiv.textContent = '';
+                                resultsDiv.style.display = 'block';
+                                renderEvents(event.data.result);
+                            } else if (event.type === 'error') {
+                                statusDiv.textContent = '❌ Erreur : ' + event.data.error;
                             }
+                        } catch (parseErr) {
+                            console.error('Erreur de parsing:', parseErr);
                         }
                     }
                 }
-            } catch (err) {
-                if (err.message === "EXPIRED_SESSION") {
-                    statusDiv.innerHTML = `
-                        <div style="color: #b45309; background: #fef3c7; padding: 15px; border-radius: 8px; border: 1px solid #fde68a;">
-                            ⏱️ <strong>Session expirée</strong><br>
-                            Pour des raisons de sécurité, veuillez rafraîchir la page pour lancer une nouvelle recherche.
-                            <br><br>
-                            <button onclick="window.location.reload();" class="primary-btn" style="padding: 10px; font-size: 14px; width: auto; margin: 0 auto;">Rafraîchir la page</button>
-                        </div>
-                    `;
-                } else {
-                    statusDiv.textContent = "❌ Oups, impossible de se connecter à la boussole.";
-                }
-                console.error(err);
-            } finally {
-                searchBtn.disabled = false;
-                searchBtn.textContent = "Nouvelle recherche";
             }
-        };
-    </script>
+        } catch (err) {
+            if (err.message === "EXPIRED_SESSION") {
+                statusDiv.innerHTML = `
+                    <div style="color: var(--primary-orange-hover); background: var(--tab-bg-active); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        ⏱️ <strong>Session expirée</strong><br>
+                        Pour des raisons de sécurité, veuillez rafraîchir la page pour lancer une nouvelle recherche.
+                        <br><br>
+                        <button onclick="window.location.reload();" class="secondary-btn" style="padding: 10px; font-size: 14px; width: auto; margin: 10px auto 0;">Rafraîchir la page</button>
+                    </div>
+                `;
+            } else {
+                statusDiv.textContent = "❌ Oups, impossible de se connecter à la boussole.";
+            }
+            console.error(err);
+        } finally {
+            searchBtn.disabled = false;
+            searchBtn.innerHTML = `
+                Nouvelle recherche
+                <svg viewBox="0 0 24 24">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            `;
+        }
+    };
+</script>
 </body>
 </html>
