@@ -17,7 +17,8 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 const API_KEY = process.env.APIKEY_DATATOURISME;
-const FEED_ID = "31a90591074ebf55f5db16bcc9a6af02";
+// const FEED_ID = "31a90591074ebf55f5db16bcc9a6af02";
+const FEED_ID = "8501d031fb912b6565ab44db5331e803";
 const BATCH_SIZE = 100;
 
 /**

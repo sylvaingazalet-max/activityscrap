@@ -493,8 +493,8 @@
     <hr>
 
     <div class="footer-links">
-        <button id="openHowBtn">Pourquoi nous ?</button>
-        <button id="openEcoBtn">Logique & Impact</button>
+        <button id="openHowBtn">Pourquoi La Boussole ?</button>
+        <button id="openEcoBtn">L'approche écolo</button>
         <button id="openLegalBtn">Mentions légales</button>
         <button id="openContactBtn">Contact</button>
     </div>
@@ -506,15 +506,15 @@
         <button id="closeHowBtn" class="close-modal">✕</button>
         <h2>Pourquoi La Boussole ?</h2>
         
-        <h3>Mieux qu'un LLM classique (ex: ChatGPT)</h3>
-        <p>Une IA conversationnelle est subjective : elle fait des choix à votre place, propose souvent les mêmes lieux mainstream, et hallucine parfois les horaires. <strong>Ici, l'IA ne prend aucune décision.</strong> Elle fait de la pure analyse sémantique : elle convertit votre envie en coordonnées mathématiques et trouve les événements locaux qui en sont factuellement les plus proches. Zéro filtre, 100% de pertinence.</p>
+        <h3>Marre des recos mainstream et des faux plans ?</h3>
+        <p>Quand tu demandes des idées de sorties à un LLM (comme ChatGPT), il choisit un peu à ta place, te propose souvent les mêmes lieux ultra-touristiques et invente parfois des horaires. <strong>Ici, l'IA ne prend aucune décision et ne cherche pas à faire la conversation.</strong> Elle traduit simplement ton envie pour trouver les événements locaux qui y correspondent factuellement. Pas de blabla, pas d'hallucination !</p>
 
-        <h3>Une base de données hyper-exhaustive</h3>
-        <p>Nous aspirons et agrégeons en continu les données d'une multitude de sources pour ne rien rater, du grand festival au petit atelier de quartier :</p>
+        <h3>Une vraie mine d'or locale</h3>
+        <p>Pour que tu ne rates rien (du gros concert au micro-atelier de quartier), j'ai automatisé la collecte et j'agrège en continu les données de partout :</p>
         <ul>
-            <li><strong>OpenAgenda :</strong> Incluant les données officielles de la Mairie de Lille et des dizaines de petits agendas associatifs locaux.</li>
+            <li><strong>OpenAgenda :</strong> Qui regroupe tous les agendas officiels de la Mairie de Lille et des dizaines de petits agendas associatifs locaux.</li>
             <li><strong>DataTourisme :</strong> La base de données nationale des offices de tourisme.</li>
-            <li><strong>Ticketmaster & Eventbrite :</strong> Pour ne rater aucun concert, spectacle ou atelier indépendant.</li>
+            <li><strong>Ticketmaster & Eventbrite :</strong> Pour ne manquer aucun concert, spectacle ou atelier indépendant.</li>
         </ul>
     </div>
 </div>
@@ -522,18 +522,14 @@
 <div id="ecoModal" class="modal-overlay">
     <div class="modal-content">
         <button id="closeEcoBtn" class="close-modal">✕</button>
-        <h2>La voie logique et écolo</h2>
-        <p>L'IA affirme une grande consommation d'énergie. L'utiliser pour générer des blocs de texte à chaque recherche (comme un chatbot) est un non-sens écologique. Notre parti pris est <strong>direct et minimaliste</strong>.</p>
+        <h2>L'approche écolo</h2>
+        <p>Utiliser l'IA pour générer de longs blocs de texte (et se faire flatter avec un "c'est génial de s'intéresser à l'art contemporain !") à chaque recherche, c'est un gouffre énergétique. Pour La Boussole, j'ai choisi une approche <strong>directe et minimaliste</strong>.</p>
         
-        <h3>L'astuce de la "Vectorisation Unique"</h3>
+        <h3>L'astuce du scan unique :</h3>
         <ul>
-            <li><strong>Une seule fois pour l'événement :</strong> Lorsqu'un événement est détecté, l'IA l'analyse <em>une seule fois pour toute sa durée de vie</em> et le transforme en coordonnées (vecteur). Impact : 0,1 à 0,2 g de CO2.</li>
-            <li><strong>Un calcul basique à la recherche :</strong> Quand vous tapez votre envie, on la vectorise en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste est un simple calcul de distance en base de données PostgreSQL.</li>
+            <li><strong>Côté événement :</strong> Quand un nouvel événement est détecté, l’IA l’analyse <em>une seule fois</em> pour toute sa durée de vie et le transforme en coordonnées numériques (un vecteur). Geste peu coûteux et efficace. Impact : 0,1 à 0,2 g de CO2.</li>
+            <li><strong>Côté recherche :</strong> Quand tu tapes ton envie, on la transforme en une fraction de seconde (0,01 à 0,05 g de CO2). Le reste ? Une simple requête de comparaison mathématique ultra-rapide en base de données.</li>
         </ul>
-
-        <div style="background: var(--tab-bg-active); padding: 15px; border-radius: 8px; margin-top: 20px;">
-            <p style="margin: 0; color: var(--text-dark);"><strong>En résumé :</strong> La Boussole utilise l'IA uniquement pour comprendre le sens des mots, pas pour bavarder. Ce choix technique (modèle Gemini Flash Lite + PostgreSQL pgvector) permet d'avoir la puissance de l'IA avec une empreinte carbone drastiquement réduite.</p>
-        </div>
     </div>
 </div>
 
