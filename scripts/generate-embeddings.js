@@ -70,7 +70,7 @@ const responseSchema = {
 // ============================================================================
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function callAIWithRetry(actionFn, retries = 3, delayMs = 3000) {
+async function callAIWithRetry(actionFn, retries = 3, delayMs = 1000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await actionFn();

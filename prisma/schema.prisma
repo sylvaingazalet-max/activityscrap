@@ -1,11 +1,17 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Si tu utilises Supabase, décommente la ligne suivante :
+  // directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+// ==========================================
+// 🧭 TABLES LA BOUSSOLE DE LILLE
+// ==========================================
 
 model Event {
   id                         String    @id @map("uid")
@@ -28,14 +34,13 @@ model Event {
   firstDateEnd               DateTime? @map("firstdate_end")
   lastDateBegin              DateTime? @map("lastdate_begin")
   lastDateEnd                DateTime? @map("lastdate_end")
-  timings                    Json?     
-  
+  timings                    Json?
   accessibility              String?
   accessibilityLabelFr       String[]  @map("accessibility_label_fr")
   
   attendanceMode             Json?     @map("attendancemode")
   onlineAccessLink           String?   @map("onlineaccesslink")
-  status                     Json?     
+  status                     Json?
   ageMin                     Int?      @map("age_min")
   ageMax                     Int?      @map("age_max")
   
@@ -44,9 +49,8 @@ model Event {
   category                   String?
   countryFr                  String?   @map("country_fr")
   
-  registration               Json?     
-  links                      Json?     
-  
+  registration               Json?
+  links                      Json?
   contributorEmail           String?   @map("contributor_email")
   contributorContactNumber   String?   @map("contributor_contactnumber")
   contributorContactName     String?   @map("contributor_contactname")
@@ -93,39 +97,30 @@ model Location {
 
 model PointOfInterest {
   id              String   @id
-  
   osmId           String?  @map("osm_id")
   osmType         String?  @map("osm_type") 
-  
   name            String?
   category        String?  
-  cuisine         String?  
+  cuisine         String?
   siret           String?  @map("ref_siret") 
-  
-  coordinates     Json?    
-  
+  coordinates     Json?
   street          String?  @map("address_street")
   housenumber     String?  @map("address_housenumber")
   postcode        String?  @map("address_postcode")
   city            String?  @map("address_city")
-  
   phone           String?
   website         String?
   facebook        String?
-  
   openingHours    String?  @map("opening_hours")
   wheelchair      String?  
   indoorSeating   String?  @map("indoor_seating")
   outdoorSeating  String?  @map("outdoor_seating")
   vegetarian      String?  @map("diet_vegetarian")
-  
-  description     String?  
-  source          String?  
-  image           String?  
-
+  description     String?
+  source          String?
+  image           String?
   summary         String?  
   embedding       Unsupported("vector")?
-
   rawTags         Json?    @map("raw_tags")
 
   createdAt       DateTime @default(now()) @map("created_at")
@@ -134,7 +129,6 @@ model PointOfInterest {
   @@map("points_of_interest")
 }
 
-// --- NOUVELLE TABLE ---
 model OpenAgenda {
   uid         String   @id @map("uid")
   title       String?
@@ -145,4 +139,73 @@ model OpenAgenda {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("open_agendas")
+}
+
+
+// ==========================================
+// 🔍 TABLES JOBFINDER AI
+// ==========================================
+
+// Ajoute ceci dans ton modèle Platform existant :
+model Platform {
+  id          BigInt      @id @default(autoincrement())
+  name        String      @unique
+  companies   Company[]
+  testedUrls  TestedUrl[] // <-- NOUVELLE LIGNE
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@map("platforms")
+}
+
+// ==========================================
+// NOUVELLE TABLE : Historique des tests d'URLs
+// ==========================================
+model TestedUrl {
+  id          BigInt   @id @default(autoincrement())
+  url         String   @unique
+  slug        String
+  platformId  BigInt   @map("platform_id")
+  platform    Platform @relation(fields: [platformId], references: [id])
+  isWorking   Boolean  @map("is_working")
+  httpStatus  Int?     @map("http_status")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("tested_urls")
+}
+
+model Company {
+  id              BigInt     @id @default(autoincrement())
+  name            String
+  slug            String     @unique
+  url             String     // L'URL de base (Page 1)
+  platformId      BigInt     @map("platform_id")
+  platform        Platform   @relation(fields: [platformId], references: [id])
+  
+  // 🧭 PARAMÈTRES DE MOTEUR DE PAGINATION
+  paginationParam String?    @map("pagination_param") // "page", "pg", "startrow"
+  paginationStep  Int?       @map("pagination_step")  // 1, 25...
+
+  jobOffers       JobOffer[]
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  @@map("companies")
+}
+
+model JobOffer {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  location    String?
+  url         String   @unique
+  
+  embedding   Unsupported("vector")?
+
+  companyId   BigInt   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  isIgnored   Boolean  @default(false) @map("is_ignored")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("job_offers")
 }
