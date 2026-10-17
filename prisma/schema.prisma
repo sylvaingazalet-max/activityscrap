@@ -6,7 +6,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   // Si tu utilises Supabase, décommente la ligne suivante :
-  // directUrl = env("POSTGRES_URL_NON_POOLING")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 // ==========================================
