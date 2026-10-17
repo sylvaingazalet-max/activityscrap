@@ -25,6 +25,7 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            box-sizing: border-box;
         }
 
         h1 {
@@ -34,12 +35,14 @@
             background: linear-gradient(45deg, #60a5fa, #a78bfa);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            text-align: center;
         }
 
         .subtitle {
             color: #94a3b8;
             margin-bottom: 20px;
             font-size: 1rem;
+            text-align: center;
         }
 
         .game-container {
@@ -48,6 +51,7 @@
             flex-wrap: wrap;
             justify-content: center;
             align-items: flex-start;
+            max-width: 100%;
         }
 
         .board-wrapper {
@@ -55,6 +59,7 @@
             padding: 15px;
             border-radius: 16px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            touch-action: manipulation;
         }
 
         .grid {
@@ -72,6 +77,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .cell.white {
@@ -81,6 +88,7 @@
 
         .cell.black {
             background-color: var(--black-cell);
+            cursor: default;
         }
 
         .player {
@@ -104,6 +112,7 @@
             border-radius: 16px;
             width: 280px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            box-sizing: border-box;
         }
 
         .stats {
@@ -139,19 +148,34 @@
 
         .key {
             background: #334155;
-            padding: 8px 4px;
+            padding: 10px 4px;
             border-radius: 6px;
             font-family: monospace;
             font-weight: bold;
             font-size: 1rem;
             color: #f8fafc;
             border-bottom: 3px solid #1e293b;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.1s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .key:hover {
+            background: #475569;
+        }
+
+        .key:active {
+            transform: translateY(2px);
+            border-bottom-width: 1px;
         }
 
         .key.inactive {
             background: #1e293b;
             color: #64748b;
             border-bottom: 3px solid #0f172a;
+            cursor: default;
+            pointer-events: none;
         }
 
         .btn {
@@ -167,6 +191,7 @@
             margin-top: 15px;
             transition: opacity 0.2s, transform 0.1s;
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            -webkit-tap-highlight-color: transparent;
         }
 
         .btn:hover {
@@ -190,6 +215,8 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         .message-overlay.active {
@@ -205,11 +232,43 @@
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
             border: 1px solid #334155;
             max-width: 360px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .message-card h2 {
             margin-top: 0;
             font-size: 2rem;
+        }
+
+        /* Responsive Media Query pour petits écrans */
+        @media (max-width: 650px) {
+            body {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            .grid {
+                grid-template-columns: repeat(10, 32px);
+                grid-template-rows: repeat(10, 32px);
+                gap: 3px;
+            }
+            .cell {
+                width: 32px;
+                height: 32px;
+            }
+            .player {
+                width: 20px;
+                height: 20px;
+            }
+            .game-container {
+                gap: 15px;
+            }
+            .sidebar {
+                width: 100%;
+                max-width: 350px;
+            }
         }
     </style>
 </head>
@@ -231,20 +290,20 @@
             </div>
 
             <div class="controls-guide">
-                <h3>Contrôles (AZERTY)</h3>
+                <h3>Contrôles / Tactile</h3>
                 <div class="key-grid">
-                    <div class="key">A</div>
-                    <div class="key">Z</div>
-                    <div class="key">E</div>
-                    <div class="key">Q</div>
-                    <div class="key inactive">S</div>
-                    <div class="key">D</div>
-                    <div class="key">W</div>
-                    <div class="key">X</div>
-                    <div class="key">C</div>
+                    <div class="key" data-key="a">A</div>
+                    <div class="key" data-key="z">Z</div>
+                    <div class="key" data-key="e">E</div>
+                    <div class="key" data-key="q">Q</div>
+                    <div class="key inactive" data-key="s">S</div>
+                    <div class="key" data-key="d">D</div>
+                    <div class="key" data-key="w">W</div>
+                    <div class="key" data-key="x">X</div>
+                    <div class="key" data-key="c">C</div>
                 </div>
                 <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 10px; text-align: center;">
-                    Carré 3x3 parfait (S ne fait rien).
+                    Tape directement une case voisine ou utilise les touches.
                 </p>
             </div>
 
@@ -387,6 +446,16 @@
                         cell.appendChild(playerEl);
                     }
 
+                    // Écouteur de clic / toucher direct sur une case voisine
+                    cell.addEventListener('click', () => {
+                        if (!gameActive) return;
+                        let dx = c - player.x;
+                        let dy = r - player.y;
+                        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && !(dx === 0 && dy === 0)) {
+                            handleMove(dx, dy);
+                        }
+                    });
+
                     gridEl.appendChild(cell);
                 }
             }
@@ -416,9 +485,7 @@
 
             const counts = countCells();
             
-            // CORRECTION DU BUG : Priorité absolue à la victoire
-            // Quand le joueur est sur la dernière case blanche, il reste 0 case blanche libre
-            if (counts.white === 1) { // Il ne reste que la case sur laquelle on est actuellement assis
+            if (counts.white === 1) { 
                 endGame(true);
             } else if (!hasValidMoves(player.x, player.y)) {
                 endGame(false);
@@ -444,12 +511,23 @@
             overlay.classList.add('active');
         }
 
+        // Gestion du clavier (Ordinateur)
         window.addEventListener('keydown', (e) => {
             let key = e.key.toLowerCase();
             if (keyMap[key] !== undefined) {
                 e.preventDefault();
                 handleMove(keyMap[key].x, keyMap[key].y);
             }
+        });
+
+        // Gestion des boutons tactiles du pavé virtuel
+        document.querySelectorAll('.key[data-key]').forEach(keyEl => {
+            keyEl.addEventListener('click', (e) => {
+                let k = e.currentTarget.getAttribute('data-key');
+                if (keyMap[k] !== undefined) {
+                    handleMove(keyMap[k].x, keyMap[k].y);
+                }
+            });
         });
 
         initGame();
